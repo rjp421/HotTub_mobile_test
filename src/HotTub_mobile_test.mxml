@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+							xmlns:s="library://ns.adobe.com/flex/spark" 
+							xmlns:components="me.whohacked.components.*"
+							xmlns:events="me.whohacked.events.*"
+							preinitialize="preinitializeHandler(event)"
+							addedToStage="addedToStageHandler(event)"
+							applicationComplete="applicationCompleteHandler(event)"
+							activate="appActivatedHandler(event)"
+							deactivate="appDeactivatedHandler(event)" 
+							runtimeDPIProvider="me.whohacked.util.DPITestClass"
+							currentState="login">
+	<!--  -->
+	
+	
+	<s:states>
+		<s:State name="login"/>
+		<s:State name="chat"/>
+	</s:states>
+	
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<!--
+	-->
+	<fx:Style source="me/whohacked/assets/CSS/appstyles.css"/>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.net.drm.DRMManager;
+			import flash.security.XMLSignatureValidator;
+			
+			import mx.core.FlexGlobals;
+			import mx.events.FlexEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			
+			
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton;
+			private var __appWideSingleton:AppWide_Singleton;
+			
+			
+			
+			private function preinitializeHandler(event:FlexEvent):void
+			{
+				__appWideEventDispatcher = AppWideEventDispatcher_Singleton.getInstance()
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				
+				event = null;
+			}
+			
+			
+			private function applicationCompleteHandler(event:FlexEvent):void
+			{
+				debugMsg("applicationCompleteHandler->  stageWidth: "+stage.stageWidth+"  stageHeight: "+stage.stageHeight+"  currentState: "+currentState);
+				
+				//var currentDensity:Number = FlexGlobals.topLevelApplication.runtimeDPI;
+				//var currentAppDPI:Number = FlexGlobals.topLevelApplication.applicationDPI;
+				var currentDensity:Number = this.runtimeDPI;
+				var currentAppDPI:Number = this.applicationDPI;
+				var currentScalingFactor:Number = currentDensity / currentAppDPI; //Obtain the total number of bytes in a particular
+				
+				NativeApplication.nativeApplication.addEventListener(Event.ACTIVATE, appActivatedHandler, false,0,true);
+				NativeApplication.nativeApplication.addEventListener(Event.DEACTIVATE, appDeactivatedHandler, false,0,true);
+				
+				stage.addEventListener(Event.RESIZE, onStageResizeEvent, false,0,true);
+				stage.addEventListener(StageOrientationEvent.ORIENTATION_CHANGE, onStageOrientationEvent, false,0,true);
+				
+				// loaded asset, and convert the bytes to kbps. 
+				// Obtain the bandwidth by dividing
+				// the amount loaded by the amount of time it took to load.
+				//var kbps:Number = ((loaderInfo.bytesTotal*8)/1000) / (totalTimeInMilliseconds/1000);
+				
+				__appWideEventDispatcher.addEventListener('appClose', appClose, false,0,true);
+				__appWideEventDispatcher.addEventListener('onSetUserID', onSetUserID, false,0,true);
+				__appWideEventDispatcher.addEventListener('onNCStatus', onNetStatusEvent, false,0,true);
+				
+				//__appWideSingleton.setCompatibilityInfo("Accelerometer", Accelerometer.isSupported); // disabled, for anti-driving only
+				//__appWideSingleton.setCompatibilityInfo("Geolocation", Geolocation.isSupported); // disabled, for anti-driving only
+				__appWideSingleton.setCompatibilityInfo("Camera", Camera.isSupported);
+				__appWideSingleton.setCompatibilityInfo("CameraUI", CameraUI.isSupported);
+				__appWideSingleton.setCompatibilityInfo("Microphone", Microphone.isSupported);
+				__appWideSingleton.setCompatibilityInfo("LocalConnection", LocalConnection.isSupported);
+				__appWideSingleton.setCompatibilityInfo("ContextMenu", ContextMenu.isSupported);
+				__appWideSingleton.setCompatibilityInfo("DatagramSocket", DatagramSocket.isSupported);
+				__appWideSingleton.setCompatibilityInfo("NativeDragManager", NativeDragManager.isSupported);
+				__appWideSingleton.setCompatibilityInfo("EncryptedLocalStore", EncryptedLocalStore.isSupported);
+				__appWideSingleton.setCompatibilityInfo("DRMManager", DRMManager.isSupported);
+				__appWideSingleton.setCompatibilityInfo("GameInput", GameInput.isSupported);
+				__appWideSingleton.setCompatibilityInfo("HTMLLoader", HTMLLoader.isSupported);
+				__appWideSingleton.setCompatibilityInfo("NativeMenu", NativeMenu.isSupported);
+				__appWideSingleton.setCompatibilityInfo("NativeProcess", NativeProcess.isSupported);
+				__appWideSingleton.setCompatibilityInfo("NativeWindow", NativeWindow.isSupported);
+				__appWideSingleton.setCompatibilityInfo("PrintJob", PrintJob.isSupported);
+				__appWideSingleton.setCompatibilityInfo("SecureSocket", SecureSocket.isSupported);
+				__appWideSingleton.setCompatibilityInfo("ServerSocket", ServerSocket.isSupported);
+				__appWideSingleton.setCompatibilityInfo("StorageVolumeInfo", StorageVolumeInfo.isSupported);
+				__appWideSingleton.setCompatibilityInfo("StageWebView", StageWebView.isSupported);
+				__appWideSingleton.setCompatibilityInfo("Updater", Updater.isSupported);
+				__appWideSingleton.setCompatibilityInfo("XMLSignatureValidator", XMLSignatureValidator.isSupported);
+				__appWideSingleton.setCompatibilityInfo("IME", IME.isSupported);
+				
+				__appWideSingleton.setCompatibilityInfo("hasAccessibility", Capabilities.hasAccessibility);
+				__appWideSingleton.setCompatibilityInfo("hasVideoEncoder", Capabilities.hasVideoEncoder);
+				__appWideSingleton.setCompatibilityInfo("hasEmbeddedVideo", Capabilities.hasEmbeddedVideo);
+				__appWideSingleton.setCompatibilityInfo("hasAudioEncoder", Capabilities.hasAudioEncoder);
+				__appWideSingleton.setCompatibilityInfo("hasAudio", Capabilities.hasAudio);
+				__appWideSingleton.setCompatibilityInfo("hasMP3", Capabilities.hasMP3);
+				__appWideSingleton.setCompatibilityInfo("hasTLS", Capabilities.hasTLS);
+				__appWideSingleton.setCompatibilityInfo("hasIME", Capabilities.hasIME);
+				__appWideSingleton.setCompatibilityInfo("hasPrinting", Capabilities.hasPrinting);
+				__appWideSingleton.setCompatibilityInfo("hasScreenBroadcast", Capabilities.hasScreenBroadcast);
+				__appWideSingleton.setCompatibilityInfo("hasScreenPlayback", Capabilities.hasScreenPlayback);
+				__appWideSingleton.setCompatibilityInfo("hasStreamingVideo", Capabilities.hasStreamingVideo);
+				__appWideSingleton.setCompatibilityInfo("hasStreamingAudio", Capabilities.hasStreamingAudio);
+				__appWideSingleton.setCompatibilityInfo("hasMultiChannelAudio", Capabilities.hasMultiChannelAudio(''));
+				
+				__appWideSingleton.setCompatibilityInfo("supportsDockIcon", NativeApplication.supportsDockIcon);
+				__appWideSingleton.setCompatibilityInfo("supportsSystemTrayIcon", NativeApplication.supportsSystemTrayIcon);
+				__appWideSingleton.setCompatibilityInfo("supportsStartAtLogin", NativeApplication.supportsStartAtLogin);
+				__appWideSingleton.setCompatibilityInfo("supportsOrientationChange", Stage.supportsOrientationChange);
+				
+				__appWideSingleton.setCompatibilityInfo("currentScalingFactor", currentScalingFactor);
+				__appWideSingleton.setCompatibilityInfo("pixelAspectRatio", Capabilities.pixelAspectRatio);
+				
+				__appWideSingleton.setCompatibilityInfo("curDensity", currentDensity);
+				__appWideSingleton.setCompatibilityInfo("runtimeDPI", this.runtimeDPI);
+				
+				__appWideSingleton.setCompatibilityInfo("curAppDPI", currentAppDPI);
+				__appWideSingleton.setCompatibilityInfo("applicationDPI", this.applicationDPI);
+				
+				__appWideSingleton.setCompatibilityInfo("screenDPI", Capabilities.screenDPI);
+				__appWideSingleton.setCompatibilityInfo("screenResolutionX", Capabilities.screenResolutionX);
+				__appWideSingleton.setCompatibilityInfo("screenResolutionY", Capabilities.screenResolutionY);
+				
+				__appWideSingleton.setCompatibilityInfo("screenColor", Capabilities.screenColor);
+				__appWideSingleton.setCompatibilityInfo("touchscreenType", Capabilities.touchscreenType);
+				__appWideSingleton.setCompatibilityInfo("stage3Ds", stage.stage3Ds.length);
+				
+				__appWideSingleton.setCompatibilityInfo("os", Capabilities.os);
+				__appWideSingleton.setCompatibilityInfo("version", Capabilities.version);
+				__appWideSingleton.setCompatibilityInfo("playerType", Capabilities.playerType);
+				__appWideSingleton.setCompatibilityInfo("manufacturer", Capabilities.manufacturer);
+				
+				__appWideSingleton.setCompatibilityInfo("isDebugger", Capabilities.isDebugger);
+				__appWideSingleton.setCompatibilityInfo("isEmbeddedInAcrobat", Capabilities.isEmbeddedInAcrobat);
+				
+				__appWideSingleton.setCompatibilityInfo("language", Capabilities.language);
+				__appWideSingleton.setCompatibilityInfo("maxLevelIDC", Capabilities.maxLevelIDC);
+				__appWideSingleton.setCompatibilityInfo("avHardwareDisable", Capabilities.avHardwareDisable);
+				__appWideSingleton.setCompatibilityInfo("localFileReadDisable", Capabilities.localFileReadDisable);
+				__appWideSingleton.setCompatibilityInfo("serverString", Capabilities.serverString);
+				
+				// The following capabilities are supported only when publishing for AIR.
+				// If you are publishing for AIR, uncomment the following lines.       
+				if (Capabilities.playerType == 'Desktop')
+				{
+					__appWideSingleton.setCompatibilityInfo("cpuArchitecture", Capabilities.cpuArchitecture);
+					__appWideSingleton.setCompatibilityInfo("languages", Capabilities.languages);
+					__appWideSingleton.setCompatibilityInfo("supports32BitProcesses", Capabilities.supports32BitProcesses);
+					__appWideSingleton.setCompatibilityInfo("supports64BitProcesses", Capabilities.supports64BitProcesses);
+				}
+				
+				detectDeviceType(stage.stageWidth, stage.stageHeight);
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('onApplicationComplete'));
+				
+				event = null;
+			}
+			
+			
+			private function addedToStageHandler(event:Event):void
+			{
+				debugMsg("addedToStageHandler->  ");
+				
+				stage.scaleMode = 'noScale';
+				
+				event = null;
+			}
+			
+			
+			private function onSetUserID(event:Event):void
+			{
+				debugMsg("onSetUserID->  ");
+				
+				currentState = "chat";
+				
+				event = null;
+			}
+			
+			
+			private function appActivatedHandler(event:Event):void
+			{
+				__appWideEventDispatcher.dispatchEvent(new Event('onAppActivated'));
+				
+				event.stopPropagation();
+				
+				this.mouseEnabled = true;
+				
+				if (stage) stage.frameRate = 24;
+				
+				//debugMsg("appActivatedHandler->  set frameRate: "+stage.frameRate);
+				
+				event = null;
+			}
+			
+			
+			private function appDeactivatedHandler(event:Event):void
+			{
+				__appWideEventDispatcher.dispatchEvent(new Event('onAppDeactivated'));
+				
+				event.stopPropagation();
+				
+				this.mouseEnabled = false;
+				
+				if (stage) stage.frameRate = 4;
+				
+				//debugMsg("appDeactivatedHandler->  set frameRate: "+stage.frameRate);
+				
+				event = null;
+			}
+			
+			
+			private function appClose(event:Event):void
+			{
+				debugMsg("appClose->  ");
+				
+				currentState = "login";
+				
+				event = null;
+			}
+			
+			
+			public function onNetStatusEvent(event:CustomEvent):void
+			{
+				if (event.eventObj.info)
+				{
+					switch(event.eventObj.info.code)
+					{
+						case 'NetConnection.Connect.Success':
+						{
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent('onNCConnected',false,false,event.cloneCustomEvent()));
+							break;
+						}
+						case 'NetConnection.Connect.Rejected':
+						{
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent('onNCRejected',false,false,event.cloneCustomEvent().eventObj));
+							break;
+						}
+						case 'NetConnection.Connect.Failed':
+						{
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent('onNCFailed',false,false,event.cloneCustomEvent()));
+							break;
+						}
+						case 'NetConnection.Connect.Closed':
+						{
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent('onNCClosed',false,false,event.cloneCustomEvent()));
+							break;
+						}
+						default:
+						{
+							break;
+						}
+					}
+				} else if (event.eventObj.error) {
+					__appWideEventDispatcher.dispatchEvent(new CustomEvent('onNCError', false,false, event.cloneCustomEvent()));
+				}
+				
+				event.stopPropagation();
+				event = null;
+			}
+			
+			
+			private function onStageResizeEvent(event:Event):void
+			{
+				debugMsg("onStageResizeEvent->  width: "+width+"  height: "+height+"  stageWidth: "+stage.stageWidth+"  stageHeight: "+stage.stageHeight);
+				
+				detectDeviceType(stage.stageWidth, stage.stageHeight);
+				
+				__appWideEventDispatcher.dispatchEvent(new CustomEvent('onStageResizeEvent',false,false, {width:width,height:height}));
+				
+				event.stopPropagation();
+				event = null;
+			}
+			
+			
+			private function onStageOrientationEvent(event:StageOrientationEvent):void 
+			{
+				var aspect:String = this.stage.stageWidth >= this.stage.stageHeight ? StageAspectRatio.LANDSCAPE : StageAspectRatio.PORTRAIT;
+				
+				debugMsg("onStageOrientationEvent->  Orientation changed from  <" + event.beforeOrientation + ">  to  <" + event.afterOrientation + ">  --  deviceOrientation: "+this.stage.deviceOrientation+"  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				/*
+				switch (event.afterOrientation)
+				{
+				case StageOrientation.DEFAULT:
+				debugMsg("onStageOrientationEvent->  Rotated to Default  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				break;
+				case StageOrientation.ROTATED_RIGHT:
+				debugMsg("onStageOrientationEvent->  Rotated right  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				break;
+				case StageOrientation.ROTATED_LEFT:
+				debugMsg("onStageOrientationEvent->  Rotated left  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				break;
+				case StageOrientation.UPSIDE_DOWN:
+				debugMsg("onStageOrientationEvent->  Rotated Upside Down  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				break;
+				case StageOrientation.UNKNOWN:
+				debugMsg("onStageOrientationEvent->  Rotated to Unknown  StageAspectRatio: "+aspect+"  currentState: "+currentState);
+				break;
+				}
+				*/
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('onStageOrientationEvent'));
+				
+				event.stopPropagation();
+				event = null;
+			}
+			
+			
+			public function detectDeviceType(stageWidth:Number, stageHeight:Number, currentScalingFactor:Number=1):void
+			{
+				var state:String;
+				var screenX:Number = Capabilities.screenResolutionX;
+				var screenY:Number = Capabilities.screenResolutionY;
+				var dpi:Number = Capabilities.screenDPI; // changed from Capabilities.screenDPI this.applicationDPI
+				var screenDiagonal:Number = Math.sqrt(((screenX*screenX)+(screenY*screenY))) / dpi;
+				var aspect:String = this.stage.stageWidth >= this.stage.stageHeight ? StageAspectRatio.LANDSCAPE : StageAspectRatio.PORTRAIT;
+				
+				// calculate the size in inches
+				var _width:Number = Math.max(stageWidth, stageHeight);
+				var _height:Number = Math.min(stageWidth, stageHeight);
+				
+				_width = width / dpi;
+				_height = height / dpi;
+				
+				if (screenDiagonal < 6)
+				{
+					debugMsg("detectDeviceType->  Device is mobile");
+					__appWideSingleton.appInfoObj.isMobile = true;
+				}
+				
+				if (_width > _height)
+				{
+					debugMsg("detectDeviceType->	LANDSCAPE  width: "+width+"  >  height: "+height);
+					__appWideSingleton.appInfoObj.isLandscape = true;
+					state = 'landscape';
+				} else {
+					debugMsg("detectDeviceType->	PORTRAIT  width: "+width+"  <  height: "+height)
+					__appWideSingleton.appInfoObj.isPortrait = true;
+					state = 'portrait';
+				}
+				
+				if (_width >= 5 || _height >= 5)
+				{
+					debugMsg("detectDeviceType->	TABLET > 5 inches  _width: "+_width+"  _height: "+_height);
+					__appWideSingleton.appInfoObj.isTablet = true;
+					state += 'Tablet';
+				} else {
+					debugMsg("detectDeviceType->	PHONE < 5 inches  _width: "+_width+"  _height: "+_height);
+					__appWideSingleton.appInfoObj.isPhone = true;
+					state += 'Phone';
+				}
+				
+				debugMsg("detectDeviceType->  applicationState: "+state+"  aspectRatio: "+aspect+"  stageWidth: "+stageWidth+"  stageHeight: "+stageHeight+"  _width: "+_width+"  _height: "+_height+"  screenDPI: "+dpi+"  runtimeDPI: "+runtimeDPI+"  applicationDPI: "+applicationDPI);
+				
+				__appWideSingleton.appInfoObj.applicationState = state;
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('onApplicationStateChange'));
+				
+				aspect = null;
+				state = null;
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id, str);
+				
+				str = null;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	<components:ChatView id="chatView" 
+						 visible.login="false"
+						 width="100%" height="100%"/>
+	
+	
+	<components:LoginView id="loginView"
+						  visible.chat="false"
+						  width="100%" height="100%"/>
+	
+	
+	
+</s:Application>

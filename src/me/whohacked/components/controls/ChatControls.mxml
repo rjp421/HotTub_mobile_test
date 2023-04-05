@@ -1,0 +1,851 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  creationComplete="creationCompleteHandler(event)"
+		  horizontalAlign="center" verticalAlign="middle"
+		  gap="2">
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<s:states>
+		<s:State name="portraitPhone" stateGroups="portrait,phone"/>
+		<s:State name="landscapePhone" stateGroups="landscape,phone"/>
+		<s:State name="portraitTablet" stateGroups="portrait,tablet"/>
+		<s:State name="landscapeTablet" stateGroups="landscape,tablet"/>
+	</s:states>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.media.Microphone;
+			import flash.net.NetStream;
+			import flash.net.SharedObject;
+			import flash.permissions.PermissionStatus;
+			
+			import mx.events.FlexEvent;
+			
+			import spark.events.PopUpEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.app.IconManager_Singleton;
+			import me.whohacked.events.CustomEvent;
+			import me.whohacked.net.AppWideNetConnection;
+			import me.whohacked.net.MediaSOClient;
+			import me.whohacked.net.NetConnectionManager_Singleton;
+			
+			private var __nc:AppWideNetConnection;
+			private var __myNetStream:NetStream;
+			private var __mediaSO:SharedObject;
+			private var __appWideSingleton:AppWide_Singleton;
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton;
+			
+			private var __h264Settings:H264VideoStreamSettings;
+			
+			private var __camSettingsCallout:CameraSettings_Callout;
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				__appWideEventDispatcher = AppWideEventDispatcher_Singleton.getInstance();
+				__nc = NetConnectionManager_Singleton.getNetConnection();
+				
+				__appWideEventDispatcher.addEventListener('onApplicationComplete', onApplicationComplete, false,0,true);
+				__appWideEventDispatcher.addEventListener('onApplicationStateChange', onApplicationStateChange, false,0,true);
+				__appWideEventDispatcher.addEventListener('onUserLoggedIn', onUserLoggedIn, false,0,true);
+				__appWideEventDispatcher.addEventListener('onUserLoggedOut', onUserLoggedOut, false,0,true);
+				__appWideEventDispatcher.addEventListener('appClose', appClose, false,0,true);
+				
+				//if (Camera.names.length <= 1) chooseCamBtn.label = 'Preview Cam';
+			}
+			
+			
+			private function logoutBtn_clickHandler(event:MouseEvent):void
+			{
+				debugMsg("logoutBtn_clickHandler->  ");
+				
+				beginLogout();
+			}
+			
+			
+			private function videoOnOffBtn_clickHandler(event:MouseEvent):void
+			{
+				if (!__appWideSingleton.localCamera)
+				{
+					if (checkDevicePermission("Camera"))
+					{
+						__appWideSingleton.localCamera = Camera.getCamera();
+					} else {
+						return;
+					}
+				}
+				
+				var msgObj:Object = {};
+				msgObj.isAdminMessage = true;
+				
+				switch (videoOnOffBtn.label)
+				{
+					case "Start Cam":
+						videoOnOffBtn.setStyle("color","#FF0000");
+						videoOnOffBtn.label = "Stop Cam";
+						
+						startVideo();
+						
+						msgObj.msg = "YOUR VIDEO IS NOW ON!";
+						
+						__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						break;
+					case "Stop Cam":
+						videoOnOffBtn.setStyle("color","#EEEEEE");
+						videoOnOffBtn.label = "Start Cam";
+						
+						stopVideo();
+						
+						msgObj.msg = "YOUR VIDEO IS NOW OFF!";
+						
+						__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						break;
+				}
+			}
+			
+			
+			private function audioOnOffBtn_clickHandler(event:MouseEvent):void
+			{
+				if (!__appWideSingleton.localMic)
+				{
+					if (checkDevicePermission("Microphone"))
+					{
+						__appWideSingleton.localMic = getEnhancedMic();
+					} else {
+						return;
+					}
+				}
+				
+				var msgObj:Object = {};
+				msgObj.isAdminMessage = true;
+				
+				switch (audioOnOffBtn.label)
+				{
+					case "Start Audio":
+						audioOnOffBtn.setStyle("color","#FF0000");
+						audioOnOffBtn.label = "Stop Audio";
+						
+						startAudio();
+						
+						msgObj.msg = "YOUR AUDIO IS NOW ON!";
+						
+						__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						break;
+					case "Stop Audio":
+						audioOnOffBtn.setStyle("color","#EEEEEE");
+						audioOnOffBtn.label = "Start Audio";
+						
+						stopAudio();
+						
+						msgObj.msg = "YOUR AUDIO IS NOW OFF!";
+						
+						__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						break;
+				}
+			}
+			
+			
+			private function chooseCam_Btn_clickHandler(event:MouseEvent):void
+			{
+				openCallout();
+			}
+			
+			
+			private function setupNetStream():void
+			{
+				if (!__myNetStream)
+				{
+					// create/connect the NetStream if it hasnt been created yet
+					__myNetStream = new NetStream(__nc);
+					
+					// set the NetStreams client to this so this class will handle function calls over the NetStream
+					__myNetStream.client = this;
+					
+					if (!__h264Settings)
+						__h264Settings = new H264VideoStreamSettings();
+				}
+			}
+			
+			
+			// TODO
+			// separate into isPublishing and isMyAudioOrVideoOn variables
+			private function isPublishing():Boolean
+			{
+				if (__appWideSingleton.userInfoObj.isMyVideoOn || __appWideSingleton.userInfoObj.isMyAudioOn)
+				{
+					return true;
+				} else {
+					return false;
+				}
+			}
+			
+			
+			private function isMyAudioOrVideoOn():Boolean
+			{
+				if (__appWideSingleton.userInfoObj.isMyVideoOn || __appWideSingleton.userInfoObj.isMyAudioOn)
+				{
+					return true;
+				} else {
+					return false;
+				}
+			}
+			
+			
+			private function startPublishing():void
+			{
+				if (isPublishing()) return;
+				
+				setupNetStream();
+				
+				var localCamera:Camera = __appWideSingleton.localCamera;
+				var mic:Microphone = __appWideSingleton.localMic;
+				
+				switch (__appWideSingleton.appInfoObj.defaultQuality)
+				{
+					case "low" :
+						if (localCamera)
+						{
+							localCamera.setMode(320,240,1,false);
+							localCamera.setQuality(16384,80);
+							localCamera.setKeyFrameInterval(2);
+						}
+						
+						if ((mic) && (mic.codec != SoundCodec.SPEEX)) mic.rate = 11;
+						
+						if (__h264Settings)
+						{
+							//__h264Settings.setMode(320,240,1);
+							//__h264Settings.setQuality(8192,80);
+							//__h264Settings.setKeyFrameInterval(10);
+							__h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1);
+							__myNetStream.videoStreamSettings = __h264Settings;
+						}
+						break;
+					case "medium" :
+						if (localCamera)
+						{
+							localCamera.setMode(320,240,3,false);
+							localCamera.setQuality(32768,80);
+							localCamera.setKeyFrameInterval(6);
+						}
+						
+						if ((mic) && (mic.codec != SoundCodec.SPEEX)) mic.rate = 22;
+						
+						if (__h264Settings)
+						{
+							//__h264Settings.setMode(320,240,3);
+							//__h264Settings.setQuality(16384,80);
+							//__h264Settings.setKeyFrameInterval(30);
+							__h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_1);
+							__myNetStream.videoStreamSettings = __h264Settings;
+						}
+						break;
+					case "high" :
+						if (localCamera)
+						{
+							localCamera.setMode(320,240,6,false);
+							localCamera.setQuality(40960,80);
+							localCamera.setKeyFrameInterval(12);
+						}
+						
+						if ((mic) && (mic.codec != SoundCodec.SPEEX)) mic.rate = 44;
+						
+						if (__h264Settings)
+						{
+							//__h264Settings.setMode(320,240,6);
+							//__h264Settings.setQuality(32768,80);
+							//__h264Settings.setKeyFrameInterval(48);
+							__h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_2);
+							__myNetStream.videoStreamSettings = __h264Settings;
+						}
+						break;
+					case "hd" :
+						if (localCamera)
+						{
+							localCamera.setMode(320,240,8,false);
+							localCamera.setQuality(65536,90);
+							localCamera.setKeyFrameInterval(16);
+						}
+						
+						if ((mic) && (mic.codec != SoundCodec.SPEEX)) mic.rate = 44;
+						
+						if (__h264Settings)
+						{
+							//__h264Settings.setMode(320,240,8);
+							//__h264Settings.setQuality(49152,90);
+							//__h264Settings.setKeyFrameInterval(16);
+							__h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_2);
+							__myNetStream.videoStreamSettings = __h264Settings;
+						}
+						break;
+					default :
+						if (localCamera)
+						{
+							localCamera.setMode(320,240,6,false);
+							localCamera.setQuality(40960,80);
+							localCamera.setKeyFrameInterval(12);
+						}
+						
+						if ((mic) && (mic.codec != SoundCodec.SPEEX)) mic.rate = 44;
+						
+						if (__h264Settings)
+						{
+							//__h264Settings.setMode(320,240,3);
+							//__h264Settings.setQuality(16384,80);
+							//__h264Settings.setKeyFrameInterval(30);
+							__h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_1_2);
+							__myNetStream.videoStreamSettings = __h264Settings;
+						}
+						break;
+					
+				}
+				
+				if (mic)
+				{
+					// mic settings
+					//mic.setLoopBack(false);
+					//mic.setUseEchoSuppression(true);
+				}
+				
+				// publish the live stream
+				__myNetStream.publish("user_" + __appWideSingleton.userInfoObj.userID, "LIVE");
+				
+				localCamera = null;
+				mic = null;
+			}
+			
+			
+			private function getEnhancedMic():Microphone
+			{
+				//var microphone:Microphone = Microphone.getEnhancedMicrophone();
+				var microphone:Microphone = null;
+				
+				if (microphone)
+				{
+					var options:MicrophoneEnhancedOptions = new MicrophoneEnhancedOptions();
+					
+					// settings
+					microphone.codec = SoundCodec.SPEEX;
+					
+					microphone.setLoopBack(false); // dont listen to the output, causes feedback
+					//microphone.setUseEchoSuppression(false); // ignored by speex but setting it anyway
+					
+					microphone.noiseSuppressionLevel = 0;
+					microphone.enableVAD = false; // voice activity detection
+					
+					microphone.gain = 50;
+					microphone.setSilenceLevel(0, 2000);
+					//microphone.setSilenceLevel(0);
+					
+					// options
+					switch(__appWideSingleton.appInfoObj.defaultQuality)
+					{
+						case "low":
+						{
+							microphone.rate = 8; // speex will only use 8 or 16
+							microphone.framesPerPacket = 1;
+							microphone.encodeQuality = 4;
+							options.autoGain = false;
+							options.echoPath = 128; // can be increased to 256 for less echo
+							options.nonLinearProcessing = false; // turn off for music
+							break;
+						}
+						case "medium":
+						{
+							microphone.rate = 16; // speex will only use 8 or 16
+							microphone.framesPerPacket = 1;
+							microphone.encodeQuality = 6;
+							options.autoGain = false;
+							options.echoPath = 128; // can be increased to 256 for less echo
+							options.nonLinearProcessing = false; // turn off for music
+							break;
+						}
+						case "high":
+						{
+							microphone.rate = 16; // speex will only use 8 or 16
+							microphone.framesPerPacket = 1;
+							microphone.encodeQuality = 8;
+							options.autoGain = false;
+							options.echoPath = 256; // can be increased to 256 for less echo
+							options.nonLinearProcessing = false; // turn off for music
+							break;
+						}
+						case "hd":
+						{
+							microphone.rate = 16; // speex will only use 8 or 16
+							microphone.framesPerPacket = 1;
+							microphone.encodeQuality = 10;
+							options.autoGain = false;
+							options.echoPath = 256; // can be increased to 256 for less echo
+							options.nonLinearProcessing = false; // turn off for music
+							break;
+						}
+						default:
+						{
+							microphone.rate = 16; // speex will only use 8 or 16
+							microphone.framesPerPacket = 1;
+							microphone.encodeQuality = 6;
+							options.autoGain = false;
+							options.echoPath = 128; // can be increased to 256 for less echo
+							options.nonLinearProcessing = false; // turn off for music
+							break;
+						}
+					}
+					
+					options.mode = MicrophoneEnhancedMode.FULL_DUPLEX;
+					
+					//microphone.addEventListener(ActivityEvent.ACTIVITY, activityHandler, false,0,true);
+					//microphone.addEventListener(StatusEvent.STATUS, statusHandler, false,0,true);
+					
+					microphone.enhancedOptions = options;
+					
+					return microphone;
+				} else {
+					microphone = Microphone.getMicrophone();
+					/*
+					microphone.setLoopBack(false);
+					microphone.setUseEchoSuppression(true);
+					*/
+					return microphone;
+				}
+			}
+			
+			
+			// start your video
+			public function startVideo():void
+			{
+				debugMsg("startVideo->  STARTING YOUR VIDEO  localCameraName: "+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+				
+				startPublishing();
+				
+				__myNetStream.attachCamera(__appWideSingleton.localCamera);
+				
+				__appWideSingleton.userInfoObj.isMyVideoOn = true;
+				
+				// send the MetaData for this local clients video/audio
+				sendMetadata();
+				
+				__nc.call("mediaManager.userVideoOn", null, __appWideSingleton.userInfoObj.clientID);
+			}
+			
+			
+			// stop your video
+			public function stopVideo():void
+			{
+				if (__myNetStream)
+				{
+					debugMsg("stopVideo->  STOPPING YOUR VIDEO");
+					
+					if (isPublishing())
+					{
+						__myNetStream.attachCamera(null);
+						
+						__appWideSingleton.userInfoObj.isMyVideoOn = false;
+						
+						__nc.call("mediaManager.userVideoOff", null, __appWideSingleton.userInfoObj.clientID);
+					}
+					
+					// stop publishing and close the NetStream if both video and audio are stopped
+					if (!__appWideSingleton.userInfoObj.isMyVideoOn && !__appWideSingleton.userInfoObj.isMyAudioOn)
+					{
+						__myNetStream.attachCamera(null);
+						__myNetStream.attachAudio(null);
+						__myNetStream.send("@clearDataFrame", "onMetaData");
+						__myNetStream.publish(null);
+						__myNetStream.close();
+						__myNetStream.dispose();
+					}
+					
+					//__appWideSingleton.localCamera = null;
+				}
+			}
+			
+			
+			
+			// start your audio
+			public function startAudio():void
+			{
+				debugMsg("startAudio->  STARTING YOUR AUDIO");
+				
+				startPublishing();
+				
+				__myNetStream.attachAudio(__appWideSingleton.localMic);
+				
+				__appWideSingleton.userInfoObj.isMyAudioOn = true;
+				
+				__nc.call("mediaManager.userAudioOn", null, __appWideSingleton.userInfoObj.clientID);
+				
+				// send the MetaData for this local clients video/audio
+				sendMetadata();
+			}
+			
+			
+			// stop your audio
+			public function stopAudio():void
+			{
+				if (__myNetStream)
+				{
+					debugMsg("stopAudio->  STOPPING YOUR AUDIO");
+					
+					if (isPublishing())
+					{
+						__myNetStream.attachAudio(null);
+						
+						__appWideSingleton.userInfoObj.isMyAudioOn = false;
+						
+						__nc.call("mediaManager.userAudioOff", null, __appWideSingleton.userInfoObj.clientID);
+					}
+					
+					// stop publishing and close the NetStream if both video and audio are stopped
+					if (!__appWideSingleton.userInfoObj.isMyVideoOn && !__appWideSingleton.userInfoObj.isMyAudioOn)
+					{
+						__myNetStream.attachCamera(null);
+						__myNetStream.attachAudio(null);
+						__myNetStream.send("@clearDataFrame", "onMetaData");
+						__myNetStream.publish(null);
+						__myNetStream.close();
+						__myNetStream.dispose();
+					}
+					
+					//__appWideSingleton.localMic = null;
+				}
+			}
+			
+			
+			private function checkDevicePermission(device:String="Camera"):Boolean
+			{
+				var retVal:Boolean = false;
+				
+				if (((device=="Camera")&&(Camera.isSupported)) || 
+					((device=="Microphone")&&(Microphone.isSupported)))
+				{
+					var checkDevice:* = (device=="Camera") ? Camera.getCamera() : Microphone.getMicrophone();
+					
+					if (((device=="Camera")&&(Camera.permissionStatus!=PermissionStatus.GRANTED)) || 
+						((device=="Microphone")&&(Microphone.permissionStatus!=PermissionStatus.GRANTED)))
+					{
+						checkDevice.addEventListener(PermissionEvent.PERMISSION_STATUS,
+							function(e:PermissionEvent):void 
+							{
+								if (e.status == PermissionStatus.GRANTED)
+								{
+									// mic allowed
+									checkDevice = null;
+									//__appWideSingleton.localMic = getEnhancedMic();
+									retVal = true;
+								} else {
+									// permission denied
+									checkDevice = null;
+									//__appWideSingleton.localMic = null;
+									retVal = false;
+								}
+								e = null;
+							}, false,0,true);
+						try {
+							checkDevice.requestPermission();
+						} catch(e:Error) {
+							// another request is in progress
+							checkDevice = null;
+							retVal = false;
+							e = null;
+						}
+					} else {
+						// mic already allowed
+						checkDevice = null;
+						//__appWideSingleton.localMic = getEnhancedMic();
+						retVal = true;
+					}
+				}
+				
+				return retVal;
+			}
+			
+			
+			private function onApplicationComplete(event:Event):void
+			{
+				currentState = __appWideSingleton.appInfoObj.applicationState;
+			}
+			
+			
+			private function onApplicationStateChange(event:Event):void
+			{
+				currentState = __appWideSingleton.appInfoObj.applicationState;
+			}
+			
+			
+			private function onUserLoggedIn(event:Event):void
+			{
+				debugMsg("onUserLoggedIn->  ");
+				
+				__mediaSO = SharedObject.getRemote("media", __nc.uri, false);
+				__mediaSO.client = new MediaSOClient();
+				//__mediaSO.connect(__nc);
+				
+				__appWideSingleton.mediaSO = __mediaSO;
+				
+				logoutBtn.enabled = true;
+				chooseCamBtn.enabled = true;
+				//previewCam_Btn.enabled = true;
+				videoOnOffBtn.enabled = true;
+				audioOnOffBtn.enabled = true;
+			}
+			
+			
+			private function onUserLoggedOut(event:Event):void
+			{
+				debugMsg("onUserLoggedOut->  ");
+				
+				// TODO: clean up
+				__appWideSingleton.localCamera = null;
+				__appWideSingleton.localMic = null;
+			}
+			
+			
+			
+			
+			
+			private function beginLogout():void
+			{
+				debugMsg("beginLogout->  ");
+				
+				if (audioOnOffBtn.label == 'Stop Audio')
+				{
+					audioOnOffBtn.setStyle("color","#EEEEEE");
+					audioOnOffBtn.label = "Start Audio";
+					
+					stopAudio();
+				}
+				
+				if (videoOnOffBtn.label == 'Stop Cam')
+				{
+					videoOnOffBtn.setStyle("color","#EEEEEE");
+					videoOnOffBtn.label = "Start Cam";
+					
+					stopVideo();
+				}
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('appClose'));
+			}
+			
+			
+			private function appClose(event:Event):void
+			{
+				if (__mediaSO)
+				{
+					__appWideSingleton.mediaSO = null;
+					
+					__mediaSO.clear();
+					__mediaSO.close();
+					__mediaSO = null;
+				}
+				
+				/*
+				if (__localVideo_V)
+				__localVideo_V.attachCamera(null);
+				*/
+				
+				if (__myNetStream)
+				{
+					__myNetStream.attachCamera(null);
+					__myNetStream.attachAudio(null);
+					__myNetStream.publish(null);
+					__myNetStream.close();
+					__myNetStream.dispose();
+					__myNetStream = null;
+				}
+				
+				__appWideSingleton.localCamera = null;
+				__appWideSingleton.localMic = null;
+				
+				__appWideSingleton.userInfoObj.isMyVideoOn = false;
+				__appWideSingleton.userInfoObj.isMyAudioOn = false;
+				
+				logoutBtn.enabled = false;
+				chooseCamBtn.enabled = false;
+				//previewCam_Btn.enabled = false;
+				videoOnOffBtn.enabled = false;
+				audioOnOffBtn.enabled = false;
+			}
+			
+			
+			
+			protected function openCallout():void
+			{
+				debugMsg("openCallout->  ");
+				
+				//modalRect.visible = true;
+				
+				__camSettingsCallout = new CameraSettings_Callout();
+				
+				__camSettingsCallout.addEventListener('close', camSettingsCallout_closeHandler);
+				
+				__camSettingsCallout.open(parentApplication.chatView, true);
+			}
+			
+			
+			protected function camSettingsCallout_closeHandler(event:PopUpEvent):void
+			{
+				__camSettingsCallout.removeEventListener('close', camSettingsCallout_closeHandler);
+				
+				__camSettingsCallout = null;
+				
+				//modalRect.visible = false;
+				
+				//debugMsg("camSettingsCallout_closeHandler->  camSettingsCallout: "+__camSettingsCallout+'  localCameraName: '+__appWideSingleton.localCamera.name);
+				//chatDebugMsg("camSettingsCallout_closeHandler->  camSettingsCallout: "+__camSettingsCallout+'  localCameraName: '+__appWideSingleton.localCamera.name);
+			}
+			
+			
+			private function sendMetadata():void
+			{ 
+				//debugMsg("sendMetaData() called");
+				
+				var myMetaData:Object = {};
+				
+				myMetaData.userID = __appWideSingleton.userInfoObj.userID;
+				myMetaData.userName = __appWideSingleton.userInfoObj.userName;
+				myMetaData.acctID = __appWideSingleton.userInfoObj.acctID;
+				myMetaData.defaultQuality = __appWideSingleton.appInfoObj.defaultQuality;
+				
+				if (__h264Settings)
+				{
+					myMetaData.profile = __h264Settings.profile;
+					myMetaData.level = __h264Settings.level;
+				}
+				
+				if (__myNetStream.videoStreamSettings)
+					myMetaData.videoCodec = __myNetStream.videoStreamSettings.codec;
+				
+				myMetaData.videoCodecID = __myNetStream.videoCodec;
+				myMetaData.audioCodecID = __myNetStream.audioCodec; // use speex with AEC, later
+				
+				myMetaData.inBufferSeek = __myNetStream.inBufferSeek;
+				myMetaData.useJitterBuffer = __myNetStream.useJitterBuffer;
+				myMetaData.backBufferTime = __myNetStream.backBufferTime;
+				myMetaData.bufferTimeMax = __myNetStream.bufferTimeMax;
+				myMetaData.bufferTime = __myNetStream.bufferTime;
+				myMetaData.liveDelay = __myNetStream.liveDelay;
+				myMetaData.isLive = __myNetStream.info.isLive;
+				
+				if (__appWideSingleton.localCamera)
+				{
+					myMetaData.camera = __appWideSingleton.localCamera.name;
+					myMetaData.width = __appWideSingleton.localCamera.width;
+					myMetaData.height = __appWideSingleton.localCamera.height;
+					myMetaData.camQuality = __appWideSingleton.localCamera.quality;
+					myMetaData.bandwidth = __appWideSingleton.localCamera.bandwidth;
+					myMetaData.keyFrameInterval = __appWideSingleton.localCamera.keyFrameInterval;
+					myMetaData.currentFPS = __appWideSingleton.localCamera.currentFPS;
+					myMetaData.maxFPS = __appWideSingleton.localCamera.fps;
+				}
+				
+				if (__appWideSingleton.localMic)
+				{
+					myMetaData.microphone = __appWideSingleton.localMic.name; // AEC later
+					myMetaData.audioRate = __appWideSingleton.localMic.rate;
+					myMetaData.audioCodec = __appWideSingleton.localMic.codec;
+					myMetaData.audioActivityLevel = __appWideSingleton.localMic.activityLevel;
+				}
+				
+				__myNetStream.send("@setDataFrame", "onMetaData", myMetaData);
+				
+				// debug
+				for (var i:* in myMetaData)
+					debugMsg("sendMetaData->\t"+i+" = "+myMetaData[i]);
+				/*
+				for (var x:* in __myNetStream)
+				debugMsg("sendMetaData->\t<NetStream>\t\t"+x+": "+__myNetStream[x]);
+				
+				for (var y:* in __myNetStream.videoStreamSettings)
+				debugMsg("sendMetaData->\t<NetStream.videoStreamSettings>\t\t"+y+": "+__myNetStream.videoStreamSettings[y]);
+				
+				for (var z:* in __myNetStream.info)
+				debugMsg("sendMetaData->\t<NetStream.info>\t\t"+z+": "+__myNetStream.info[z]);
+				
+				z = null;
+				y = null;
+				x = null;
+				*/
+				i = null;
+				myMetaData = null;
+			}
+			
+			
+			private function onPeerConnect(subscriber:NetStream):Boolean
+			{
+				debugMsg("onPeerConnect->  subscriber: "+subscriber);
+				
+				return __appWideSingleton.isMediaPrivate;
+			}
+			
+			
+			public function onFCSubscribe(infoObj:Object):void
+			{
+				debugMsg("onFCSubscribe->  infoObj: "+infoObj);
+				
+				infoObj = null;
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id, str);
+				str = null;
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	
+	
+	<s:Button id="logoutBtn" label="Logout" 
+			  enabled="false" height="60" width="100%"
+			  color="#EEEEEE"
+			  icon="{IconManager_Singleton.getInstance().getIcon('app_door_out')}"
+			  click="logoutBtn_clickHandler(event)"/>
+	
+	<s:Button id="chooseCamBtn"
+			  label="Choose Cam" height="60" width="100%"
+			  color="#EEEEEE"
+			  click="chooseCam_Btn_clickHandler(event)"/>
+	
+	<s:Button id="videoOnOffBtn" label="Start Cam" 
+			  color="#EEEEEE" enabled="false" height="60" width="100%"
+			  icon="{IconManager_Singleton.getInstance().getIcon('app_cam')}"
+			  click="videoOnOffBtn_clickHandler(event)"/>
+	
+	<s:Button id="audioOnOffBtn" label="Start Audio" 
+			  color="#EEEEEE" enabled="false" height="60" width="100%"
+			  icon="{IconManager_Singleton.getInstance().getIcon('app_audio')}"
+			  click="audioOnOffBtn_clickHandler(event)"/>
+	
+	
+	
+	
+</s:VGroup>

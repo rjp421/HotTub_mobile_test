@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Callout xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark"
+		   open="openHandler(event)"
+		   horizontalPosition="middle" 
+		   verticalPosition="middle" 
+		   moveForSoftKeyboard="true" 
+		   backgroundColor="#DDDDDD"
+		   accessibilityEnabled="false"
+		   contentBackgroundColor="#333333">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import spark.events.PopUpEvent;
+			
+			
+			
+			public var textInputName:String = '';
+			
+			
+			
+			protected function openHandler(event:PopUpEvent):void
+			{
+				trace(this.className + ".openHandler->  ");
+				
+				text_TI.setFocus();
+				text_TI.selectAll();
+			}
+			
+			
+			public function ok_Btn_clickHandler(event:MouseEvent):void
+			{
+				close(true, {inputName:textInputName, text:text_TI.text});
+			}
+			
+			
+			public function text_TI_enterKeyHandler(event:FlexEvent):void
+			{
+				close(true, {inputName:textInputName, text:text_TI.text});
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	<s:HGroup width="100%" height="100%" gap="0"
+			  paddingLeft="3"
+			  paddingRight="3"
+			  paddingTop="3"
+			  paddingBottom="3"
+			  horizontalAlign="center" 
+			  verticalAlign="middle">
+		
+		
+		<s:Label id="inputName_L"
+				 height="100%"
+				 fontSize="26"
+				 textAlign="right"
+				 verticalAlign="middle"/>
+		
+		
+		<s:Spacer width="2"/>
+		
+		
+		<s:TextInput id="text_TI" 
+					 width="100%" 
+					 fontSize="24" 
+					 textAlign="left" 
+					 maxChars="42"
+					 contentBackgroundColor="0xEEEEEE" 
+					 accessibilityEnabled="false" 
+					 skinClass="spark.skins.mobile.TextInputSkin"
+					 enter="text_TI_enterKeyHandler(event)"/>
+		
+		
+		<s:Button id="ok_Btn" 
+				  width="60" height="100%" label="OK" 
+				  click="ok_Btn_clickHandler(event)"/>
+		
+		
+	</s:HGroup>
+	
+	
+	
+	
+	
+</s:Callout>

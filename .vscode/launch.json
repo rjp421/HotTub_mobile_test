@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "swf",
+        "request": "launch",
+        "name": "Launch SWF (N7)",
+        "program": "${workspaceFolder}/bin/HotTub_mobile_test-app.xml",
+        "args": [],
+        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\bin\\adl64.exe",
+        "profile": "mobileDevice",
+        "screensize": "1200x1920:1200x1824",
+        "screenDPI": 323,
+        "versionPlatform": "AND",
+        "preLaunchTask": "Adobe AIR: package Android debug - asconfig.json"
+      },
+      {
+        "type": "swf",
+        "request": "launch",
+        "name": "Launch SWF (S7)",
+        "program": "${workspaceFolder}/bin/HotTub_mobile_test-app.xml",
+        "args": [],
+        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\bin\\adl64.exe",
+        "profile": "mobileDevice",
+        "screensize": "1440x2560:1440x2560",
+        "screenDPI": 576,
+        "versionPlatform": "AND",
+        "preLaunchTask": "Adobe AIR: package Android debug - asconfig.json"
+      }
+    ]
+}

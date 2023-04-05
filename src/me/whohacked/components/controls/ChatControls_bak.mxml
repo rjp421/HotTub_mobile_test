@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  horizontalAlign="center" verticalAlign="middle"
+		  creationComplete="creationCompleteHandler(event)">
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.media.Microphone;
+			import flash.net.NetStream;
+			import flash.net.SharedObject;
+			
+			import mx.events.FlexEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			import me.whohacked.net.AppWideNetConnection;
+			import me.whohacked.net.MediaSOClient;
+			import me.whohacked.net.NetConnectionManager_Singleton;
+			
+			
+			private var Cam:Camera;
+			private var Cams:Array;
+			private var CamsAvailable:uint;
+			private var LocalVideo:Video;
+			
+			private var nc:AppWideNetConnection;
+			private var myNetStream:NetStream;
+			private var mediaSO:SharedObject;
+			private var __appWideSingleton:AppWide_Singleton;
+			
+			public var clientID:Number;
+			public var acctID:Number;
+			public var userID:Number;
+			public var userName:String;
+			public var defaultQuality:String;
+			public var isMyVideoOn:Boolean;
+			public var isMyAudioOn:Boolean;
+			public var viewedByUserIDs_A:Array;
+			public var heardByUserIDs_A:Array;
+			public var camera:Camera = null;
+			public var mic:Microphone = null;
+			
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				debugMsg("creationCompleteHandler->  ");
+				
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				
+				nc = NetConnectionManager_Singleton.getNetConnection();
+				
+				defaultQuality = __appWideSingleton.appInfoObj.defaultQuality;
+				
+				var _userInfoObj:Object = AppWide_Singleton.getUserInfoObj();
+				
+				clientID = _userInfoObj.clientID;
+				acctID = _userInfoObj.acctID;
+				userID = _userInfoObj.userID;
+				userName = _userInfoObj.userName;
+				isMyVideoOn = _userInfoObj.isMyVideoOn;
+				isMyAudioOn = _userInfoObj.isMyAudioOn;
+				viewedByUserIDs_A = _userInfoObj.viewedByUserIDs_A;
+				heardByUserIDs_A = _userInfoObj.heardByUserIDs_A;
+				
+				AppWideEventDispatcher_Singleton.getInstance().addEventListener("onUserLoggedIn", onUserLoggedIn, false,0,true);
+			}
+			
+			
+			private function onUserLoggedIn(event:Event):void
+			{
+				//debugMsg("  LOGGED IN:  "+event.eventObj.userID+"  /  "+event.eventObj.userName);
+				
+				initCamera();
+				
+				initMediaManager();
+			}
+			
+			
+			public function initMediaManager():void
+			{
+				mediaSO = SharedObject.getRemote("media", nc.uri, false);
+				mediaSO.client = new MediaSOClient();
+				mediaSO.connect(nc);
+				
+			}
+			
+			
+			private function camOnOffBtn_clickHandler(event:MouseEvent):void
+			{
+				var msgObj:Object = {};
+				msgObj.isAdminMessage = true;
+				
+				switch (camOnOffBtn.label)
+				{
+					case "Start Cam":
+						camOnOffBtn.setStyle("color","#FF0000");
+						camOnOffBtn.label = "Stop Cam";
+						
+						startVideo(userID);
+						
+						msgObj.msg = "* Admin:  YOUR VIDEO IS NOW ON!";
+						
+						AppWideEventDispatcher_Singleton.getInstance().dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						
+						break;
+					case "Stop Cam":
+						camOnOffBtn.setStyle("color","#111111");
+						camOnOffBtn.label = "Start Cam";
+						
+						stopVideo(userID);
+						
+						msgObj.msg = "* Admin:  YOUR VIDEO IS NOW OFF!";
+						
+						AppWideEventDispatcher_Singleton.getInstance().dispatchEvent(new CustomEvent('receiveChatMessage',false,false,msgObj));
+						
+						break;
+				}
+			}
+			
+			
+			private function setupNetStream():void
+			{
+				if (!myNetStream)
+				{
+					// create/connect the NetStream if it hasnt been created yet
+					myNetStream = new NetStream(nc);
+					// set the NetStreams client to this so this class will handle function calls over the NetStream
+					myNetStream.client = this;
+				}
+			}
+			
+			
+			public function isPublishing():Boolean
+			{
+				if (isMyVideoOn || isMyAudioOn)
+				{
+					return true;
+				} else {
+					return false;
+				}
+			}
+			
+			
+			// start your video
+			public function startVideo(_userID:Number):void
+			{
+				// if it is you sarting the video
+				if (_userID == userID)
+				{
+					camera = Camera.getCamera();
+					if (camera) {
+						trace("|###| MediaManager.startVideo |###|>  STARTING YOUR VIDEO");
+						switch (defaultQuality)
+						{
+							case "low" :
+								camera.setMode(160,120,2,false);
+								camera.setQuality(16384,90);
+								//camera.setKeyFrameInterval(2);
+								break;
+							case "medium" :
+								camera.setMode(320,240,6,false);
+								camera.setQuality(40960,90);
+								//camera.setKeyFrameInterval(6);
+								break;
+							case "high" :
+								camera.setMode(320,240,8,false);
+								camera.setQuality(65536,90);
+								//camera.setKeyFrameInterval(8);
+								break;
+						}
+						
+						if (!isPublishing())
+						{
+							setupNetStream();
+							// publish the live stream
+							myNetStream.publish("user_" + userID.toString(), "LIVE");
+						}
+						
+						myNetStream.attachCamera(camera);
+						
+						isMyVideoOn = true;
+						
+						nc.call("mediaManager.userVideoOn",null,userID);
+					} else {
+						//Alert.show("You don't seem to have a camera.");
+					}
+				} else { // else if someone else is starting video
+					
+				}
+			}
+			
+			
+			// stop your video
+			public function stopVideo(_userID:Number):void
+			{
+				// if it is you stopping the video
+				if (_userID == userID)
+				{
+					trace("|###| MediaManager.stopVideo |###|>  STOPPING YOUR VIDEO");
+					
+					camera = null;
+					
+					if (isPublishing())
+					{
+						myNetStream.attachCamera(null);
+						isMyVideoOn = false;
+						nc.call("mediaManager.userVideoOff",null,userID);
+					}
+					
+					// stop publishing and close the NetStream if both video and audio are stopped
+					if (!isMyVideoOn && !isMyAudioOn)
+					{
+						myNetStream.publish(null);
+						myNetStream.close();
+						myNetStream = null;
+					}
+				}
+			}
+			
+			
+			
+			
+			
+			
+			private function initCamera():void {
+				CamsAvailable = ( Camera.isSupported ) ? Camera.names.length : 0;
+				Cams = ( Camera.isSupported) ? Camera.names : [];
+				if( CamsAvailable >= 1 ) {
+					Cam = Camera.getCamera( String( Cams[ 0 ] ) );
+					if( CamsAvailable >= 2 ) {
+						Cam = Camera.getCamera( String( Cams[ 1 ] ) );
+					}
+				}
+				
+				setUpLocalVideo();
+			}
+			
+			
+			private function setUpLocalVideo():void {
+				//debug( "Setting up local video" );
+				LocalVideo = new Video( this.LVideo.width, this.LVideo.height );
+				LocalVideo.attachCamera( Cam );
+				LVideo.addChild( LocalVideo );
+			}
+			
+			
+			
+			
+			
+			
+			public function close():void
+			{
+				if (mediaSO)
+				{
+					mediaSO.close();
+					userID = 0;
+				}
+			}
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id,str);
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	<s:Button id="camOnOffBtn" label="Start Cam" color="#EEEEEE"
+			  click="camOnOffBtn_clickHandler(event)"
+			  horizontalCenter="0" verticalCenter="0"/>
+	
+	
+	<s:VideoDisplay id="LVideo"
+					width="160" height="120"
+					horizontalCenter="0" verticalCenter="0"/>
+	
+	
+</s:VGroup>

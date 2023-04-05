@@ -1,0 +1,733 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:List xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark"
+		itemRenderer="me.whohacked.components.userlist.UserList_ItemRenderer"
+		creationComplete="userListCreationCompleteHandler(event)"
+		doubleClickEnabled="true" doubleClick="itemDoubleClickHandler(event)">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.events.FlexEvent;
+			import mx.utils.StringUtil;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			import me.whohacked.net.NetConnectionManager_Singleton;
+			
+			
+			[Bindable]
+			private var sortName:Sort;
+			// The sort fields used to determine the sort.
+			private var sortByName:SortField;
+			// the userListPanel vars
+			[Bindable]
+			public var dockedUserIDs_A:ArrayCollection;
+			public var userList_DP:ArrayCollection;
+			public var userCmdObj:Object;
+			public var popUpMenu:*;
+			
+			
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton;
+			private var usersSO:SharedObject;
+			private var userInfoObj:Object;
+			
+			
+			private function userListCreationCompleteHandler(event:FlexEvent):void
+			{
+				debugMsg("|###| UserList |###|>  LOADED");
+				
+				__appWideEventDispatcher = AppWideEventDispatcher_Singleton.getInstance();
+				__appWideEventDispatcher.addEventListener('onSetUserID', onSetUserID);
+				__appWideEventDispatcher.addEventListener('onUserLoggedIn', onUserLoggedIn);
+				__appWideEventDispatcher.addEventListener('beginLogout', beginLogout);
+				__appWideEventDispatcher.addEventListener('appClose', appClose);
+				
+				dockedUserIDs_A = AppWide_Singleton.getInstance().dockedUserIDs_A;
+				userInfoObj = AppWide_Singleton.getUserInfoObj();
+				usersSO = AppWide_Singleton.getInstance().usersSO;
+				
+				event = null;
+			}
+			
+			
+			private function onSetUserID(event:CustomEvent):void
+			{
+			}
+			
+			
+			private function onUserLoggedIn(event:Event):void
+			{
+				initUserList();
+			}
+			
+			
+			private function beginLogout(event:Event):void
+			{
+			}
+			
+			
+			public function initUserList():void
+			{
+				/*if ((usersSO) && (usersSO.hasEventListener(SyncEvent.SYNC)))
+				{
+					usersSO.removeEventListener(SyncEvent.SYNC, userListSoOnSync);
+				}
+				
+				usersSO = SharedObject.getRemote("users", NetConnectionManager_Singleton.getNetConnection().uri, false);
+				usersSO.client = this;
+				
+				usersSO.connect(NetConnectionManager_Singleton.getNetConnection());
+				
+				if (!usersSO.hasEventListener(SyncEvent.SYNC))
+				{
+					usersSO.addEventListener(SyncEvent.SYNC, userListSoOnSync);
+				}
+				*/
+				if (!__appWideEventDispatcher.hasEventListener("beginLogout"))
+				{
+					__appWideEventDispatcher.addEventListener("beginLogout", beginLogout);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("userListPanel_addUser"))
+				{
+					__appWideEventDispatcher.addEventListener("userListPanel_addUser", userListPanel_addUser);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("userListPanel_removeUser"))
+				{
+					__appWideEventDispatcher.addEventListener("userListPanel_removeUser", userListPanel_removeUser);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("mediaSOClient_userVideoOn"))
+				{
+					__appWideEventDispatcher.addEventListener("mediaSOClient_userVideoOn",userVideoOn);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("mediaSOClient_userVideoOff"))
+				{
+					__appWideEventDispatcher.addEventListener("mediaSOClient_userVideoOff",userVideoOff);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("mediaSOClient_userAudioOn"))
+				{
+					__appWideEventDispatcher.addEventListener("mediaSOClient_userAudioOn",userAudioOn);
+				}
+				if (!__appWideEventDispatcher.hasEventListener("mediaSOClient_userAudioOff"))
+				{
+					__appWideEventDispatcher.addEventListener("mediaSOClient_userAudioOff",userAudioOff);
+				}
+				
+				//Create a Sort object to sort the ArrrayCollection.
+				sortName = new Sort();
+				sortByName = new SortField("userName", true);
+				sortName.fields = [sortByName];
+				
+				userList_DP = AppWide_Singleton.getUserList_AC();
+				userList_DP.sort = sortName;
+				
+				// Refresh the collection view to show the sort.
+				userList_DP.refresh();
+				
+				this.dataProvider = userList_DP;
+				this.labelField = "userName";
+				
+				sortName = null;
+				sortByName = null;
+			}
+			
+			
+			private function userListSoOnSync(event:SyncEvent):void
+			{
+				//debugMsg("|###| UserList.userListSoOnSync |###|>  ");
+				
+				for (var prop:String in usersSO.data) 
+				{
+					//debugMsg("|_userListSoOnSync.prop> "+prop+" = "+usersSO.data[prop]);
+				}
+				
+				for (var i:Object in usersSO.data)
+				{
+					usersSO.data[i].userName = StringUtil.trim(usersSO.data[i].userName);
+					addUser(usersSO.data[i],true);
+					//debugMsg("######## usersSO.data[i].index ###########>  usersSO.data[i]: "+usersSO.data[i]+" = "+i);
+				}
+				
+				if (usersSO.hasEventListener(SyncEvent.SYNC))
+				{
+					//stop the SO SYNC event listener once it has loaded
+					//debugMsg("|###| UserList.userListSoOnSync |###|>  hasEventListener(SyncEvent.SYNC): "+usersSO.hasEventListener(SyncEvent.SYNC));
+					//debugMsg("|###| UserList.userListSoOnSync |###|>  REMOVING usersSO.SyncEvent");
+					usersSO.removeEventListener(SyncEvent.SYNC, userListSoOnSync);
+					//debugMsg("|###| UserList.userListSoOnSync |###|>  hasEventListener(SyncEvent.SYNC): "+usersSO.hasEventListener(SyncEvent.SYNC));
+				}
+				
+				var delayTimer:Timer = new Timer(1000, 1);
+				
+				delayTimer.addEventListener(TimerEvent.TIMER,dispatchUserListLoaded);
+				delayTimer.start();
+				
+				function dispatchUserListLoaded(event:TimerEvent):void
+				{
+					event.currentTarget.stop();
+					AppWideEventDispatcher_Singleton.getInstance().dispatchEvent(new Event("onUserListLoaded", false, false));
+				}
+				
+				delayTimer = null;
+				
+				invalidateDisplayList();
+				
+				event = null;
+			}
+			
+			
+			// called when a user joins the room
+			public function userListPanel_addUser(event:CustomEvent):void
+			{
+				//debugMsg("|###| UserListPanel.userList_addUser |###|>  event: "+event+"  userName: "+event.eventObj.userName);
+				for (var i:Object in userList_DP)
+				{
+					// check if the users userID is your userID
+					if (event.eventObj.userID == userInfoObj.userID)
+					{
+						event.eventObj.viewedByUserIDs_A = userInfoObj.viewedByUserIDs_A;
+						event.eventObj.heardByUserIDs_A = userInfoObj.heardByUserIDs_A;
+						event.eventObj.isMyVideoOn = userInfoObj.isMyVideoOn;
+						event.eventObj.isMyAudioOn = userInfoObj.isMyAudioOn;
+					}
+					event.eventObj.userName = StringUtil.trim(event.eventObj.userName);
+				}/*
+				if (parentDocument.parentDocument.isUserIgnored(event.eventObj.acctID, event.eventObj.nonDuplicateName))
+				{
+					event.eventObj.isIgnored = true;
+				} else {
+					event.eventObj.isIgnored = false;
+				}*/
+					event.eventObj.isIgnored = false;
+				
+				userList_DP.addItem(event.eventObj);
+				
+				if ((event.eventObj.userID != userInfoObj.userID) && (!event.eventObj.isOnSync))
+				{
+					__appWideEventDispatcher.dispatchEvent(new CustomEvent('userEnterLeave',false,false,{userName:event.eventObj.userName,joinLeave:"entered"}));
+				}
+				
+				//debugMsg("|###| UserListPanel.userList_addUser |###|>  ADDED userID: "+event.eventObj.userID+"  userName: "+event.eventObj.userName+"  viewedBy.length: "+userInfoObj.viewedBy.length+" heardBy.length: "+userInfoObj.heardBy.length+" isMyVideoOn: "+userInfoObj.isMyVideoOn+" isMyAudioOn: "+userInfoObj.isMyAudioOn+" to userList_DP.index: "+userList_DP.getItemIndex(event.eventObj));
+				event = null;
+				i = null;
+				
+				invalidateDisplayList();
+			}
+			
+			
+			// called when a user leaves the room
+			public function userListPanel_removeUser(event:CustomEvent):void
+			{
+				//debugMsg("|###| UserListPanel.userList_removeUser |###|> event: "+event+"  userID: "+event.eventObj.userID+"  userName: "+event.eventObj.userName);
+				for (var i:int = 1; x <= AppWide_Singleton.getInstance().numTotalCamSpots; x++)
+				{
+					if (userList_DP[i].userID == event.eventObj.userID)
+					{
+						// remove the user from the array which shows who is watching your cam
+						if (userInfoObj.viewedBy["user_"+event.eventObj.userID])
+						{
+							userInfoObj.viewedBy.removeItemAt(userInfoObj.viewedBy.getItemIndex("user_"+event.eventObj.userID));
+						}
+						// remove the user from the array which shows who is listening to your audio
+						if (userInfoObj.heardBy["user_"+event.eventObj.userID])
+						{
+							userInfoObj.heardBy.removeItemAt(userInfoObj.heardBy.getItemIndex("user_"+event.eventObj.userID));
+						}
+						
+						// check to see if the users cam is docked
+						if ((userList_DP[i])&&(dockedUserIDs_A[userList_DP[i].userID]))
+						{
+							//debugMsg("|###| UserListPanel.userListPanel_removeUser |###|>  AppWide_Singleton.getInstance().dockedUsers_AC.length: "+AppWide_Singleton.getInstance().dockedUsers_AC.length+"  contains(userList_DP[i]): "+AppWide_Singleton.getInstance().dockedUsers_AC.contains(userList_DP[i]));
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent("undockCamSpot",false,false,userList_DP[i]));
+						}
+						
+						if (event.eventObj.userID != userInfoObj.userID)
+						{
+							__appWideEventDispatcher.dispatchEvent(new CustomEvent('userEnterLeave',false,false,{userName:event.eventObj.userName,joinLeave:"left"}));
+						}
+					}
+				}
+				
+				//debugMsg("|###| UserListPanel.userListPanel_removeUser |###|>  REMOVING user_"+userList_DP[i].userID+"  userName: "+userList_DP[i].userName);
+				userList_DP.removeItemAt(userList_DP.getItemIndex(userList_DP[i]));
+				
+				invalidateDisplayList();
+				
+				event = null;
+			}
+			
+			
+			protected function userVideoOn(event:CustomEvent):void
+			{
+				userMediaOnOff(event.eventObj.userID,"video",true);
+				event = null;
+			}
+			
+			
+			protected function userVideoOff(event:CustomEvent):void
+			{
+				userMediaOnOff(event.eventObj.userID,"video",false);
+				event = null;
+			}
+			
+			protected function userAudioOn(event:CustomEvent):void
+			{
+				userMediaOnOff(event.eventObj.userID,"audio",true);
+				event = null;
+			}
+			
+			
+			protected function userAudioOff(event:CustomEvent):void
+			{
+				userMediaOnOff(event.eventObj.userID,"audio",false);
+				event = null;
+			}
+			
+			
+			public function userMediaOnOff(userID:Number,media:String,onOff:Boolean):void
+			{
+				debugMsg("UserListPanel.userMediaOnOff->  userID: "+userID+"  media: "+media+"  onOff: "+onOff);
+				
+				for (var i:Object in userList_DP)
+				{
+					if (userList_DP[i].userID == userID)
+					{
+						switch (media)
+						{
+							case "video":
+								if (onOff)
+								{
+									userList_DP[i].isUsersVideoOn = true;
+								} else {
+									userList_DP[i].isUsersVideoOn = false;
+								}
+								break;
+							case "audio":
+								if (onOff)
+								{
+									userList_DP[i].isUsersAudioOn = true;
+								} else {
+									userList_DP[i].isUsersAudioOn = false;
+								}
+								break;
+						}
+					}
+				}
+				
+				userList_DP.refresh();
+				invalidateDisplayList();
+				
+				media = null;
+				i = null;
+			}
+			
+			
+			public function ignoredUser(ignoreInfo:Object):void
+			{
+				var isAGuestIgnoring:Boolean = (ignoreInfo.whoIgnoredAcctID == 0);
+				var isIgnoringAGuest:Boolean = (ignoreInfo.ignoredWhoAcctID == 0);
+				var isLocalClientIgnoring:Boolean = (((ignoreInfo.whoIgnoredAcctID != 0) && 
+					(ignoreInfo.whoIgnoredAcctID == parentApplication.lobby.mediaManager.acctID)) ||
+					(ignoreInfo.whoIgnoredName == parentApplication.lobby.mediaManager.userName));
+				var isIgnoringLocalClient:Boolean = (((ignoreInfo.ignoredWhoAcctID != 0) && 
+					(ignoreInfo.ignoredWhoAcctID == parentApplication.lobby.mediaManager.acctID)) ||
+					(ignoreInfo.ignoredWhoName == parentApplication.lobby.mediaManager.userName));
+				
+				// find the ignored user
+				for (var i:int = 0; i < userList_DP.length; i++) 
+				{
+					if ((!isLocalClientIgnoring) && 
+						(((!isAGuestIgnoring) && 
+							(userList_DP[i].acctID == ignoreInfo.whoIgnoredAcctID)/* && 
+						(ignoreInfo.whoIgnoredAcctID != parentApplication.lobby.mediaManager.acctID)*/) ||
+							((isAGuestIgnoring) && 
+								(userList_DP[i].userName == ignoreInfo.whoIgnoredName)/* && 
+							(ignoreInfo.whoIgnoredName != parentApplication.lobby.mediaManager.userName)*/)))
+					{
+						userList_DP[i].hasBlocked = true;
+					}
+					
+					if ((!isIgnoringLocalClient) && 
+						(((!isIgnoringAGuest) &&
+							(userList_DP[i].acctID == ignoreInfo.ignoredWhoAcctID)/* || 
+						(ignoreInfo.ignoredWhoAcctID != parentApplication.lobby.mediaManager.acctID)*/) ||
+							((isIgnoringAGuest) && 
+								(userList_DP[i].userName == ignoreInfo.ignoredWhoName)/* || 
+							(ignoreInfo.ignoredWhoName != parentApplication.lobby.mediaManager.userName)*/)))
+					{
+						userList_DP[i].isIgnored = true;
+						
+						//userList_DP[i][(isIgnoringLocalClient ? "hasBlocked" : "isIgnored")] = true;
+						/*
+						// someone blocked the local client
+						if (((ignoreInfo.ignoredWhoAcctID != 0) && 
+						(ignoreInfo.ignoredWhoAcctID == parentApplication.lobby.mediaManager.acctID)) ||
+						(ignoreInfo.ignoredWhoName == parentApplication.lobby.mediaManager.userName))
+						{
+						userList_DP[i].hasBlocked = true;
+						
+						continue;
+						}
+						
+						// if the local client blocked someone
+						if (((ignoreInfo.whoIgnoredAcctID != 0) && 
+						(ignoreInfo.whoIgnoredAcctID == parentApplication.lobby.mediaManager.acctID)) ||
+						(ignoreInfo.whoIgnoredName == parentApplication.lobby.mediaManager.userName))
+						{
+						userList_DP[i].isIgnored = true;
+						
+						continue;
+						}
+						*/
+						
+						//break;
+					}
+					
+					/*
+					// if the local client blocked someone
+					if (((ignoreInfo.whoIgnoredAcctID != 0) && 
+					(ignoreInfo.whoIgnoredAcctID == parentApplication.lobby.mediaManager.acctID)) ||
+					(ignoreInfo.whoIgnoredName == parentApplication.lobby.mediaManager.userName))
+					{
+					userList_DP[i].isIgnored = true;
+					
+					continue;
+					}
+					
+					// if the local client blocked this user
+					if (((userList_DP[i].acctID != 0) && 
+					(userList_DP[i].acctID == ignoreInfo.whoIgnoredAcctID)) ||
+					(userList_DP[i].userName == ignoreInfo.whoIgnoredName))
+					{
+					userList_DP[i].isIgnored = true;
+					}
+					
+					// ----------------------------------------
+					// this user item is the local client
+					if ((userList_DP[i].acctID != 0) && 
+					(userList_DP[i].ignoredWhoAcctID == parentApplication.lobby.mediaManager.acctID))
+					{
+					// if this user blocked you
+					if ((ignoreInfo.whoIgnoredAcctID == userList_DP[i].acctID) || 
+					(ignoreInfo.whoIgnoredName == userList_DP[i].userName))
+					{
+					userList_DP[i].hasBlocked = true;
+					}
+					} else {
+					// this user item is another user
+					// if this user is blocked
+					if (((userList_DP[i].acctID != 0) && 
+					(userList_DP[i].acctID == ignoreInfo.ignoredWhoAcctID)) ||
+					(userList_DP[i].userName == ignoreInfo.ignoredWhoName))
+					{
+					userList_DP[i].isIgnored = true;
+					}
+					}*/
+				}
+				
+				userList_DP.refresh();
+				this.invalidateDisplayList();
+				
+				//i = null;
+				//isIgnoringAGuest = null;
+				//isAGuestIgnoring = null;
+				ignoreInfo = null;
+			}
+			
+			
+			public function unignoredUser(ignoreInfo:Object):void
+			{
+				trace("UserListPanel.unignoredUser->  whoIgnoredName: "+ignoreInfo.whoIgnoredName+"  ignoredWhoName: "+ignoreInfo.ignoredWhoName);
+				
+				var isAGuestUnignoring:Boolean = (ignoreInfo.whoIgnoredAcctID == 0);
+				var isUnignoringAGuest:Boolean = (ignoreInfo.ignoredWhoAcctID == 0);
+				
+				for (var i:Object in userList_DP)
+				{
+					if (((!isAGuestUnignoring) && 
+						(userList_DP[i].acctID == ignoreInfo.whoIgnoredAcctID) && 
+						(ignoreInfo.whoIgnoredAcctID != parentApplication.lobby.mediaManager.acctID)) ||
+						((isAGuestUnignoring) && 
+							(userList_DP[i].userName == ignoreInfo.whoIgnoredName) && 
+							(ignoreInfo.whoIgnoredName != parentApplication.lobby.mediaManager.userName)))
+					{
+						userList_DP[i].hasBlocked = false;
+					}
+					
+					if (((!isUnignoringAGuest) &&
+						(userList_DP[i].acctID == ignoreInfo.ignoredWhoAcctID) && 
+						(ignoreInfo.ignoredWhoAcctID != parentApplication.lobby.mediaManager.acctID)) ||
+						((isUnignoringAGuest) && 
+							(userList_DP[i].userName == ignoreInfo.ignoredWhoName) && 
+							(ignoreInfo.ignoredWhoName != parentApplication.lobby.mediaManager.userName)))
+					{
+						userList_DP[i].isIgnored = false;
+					}
+				}
+				
+				userList_DP.refresh();
+				this.invalidateDisplayList();
+				
+				i = null;
+				//isUnignoringAGuest = null;
+				//isAGuestUnignoring = null;
+				ignoreInfo = null;
+			}
+			
+			
+			public function setBlockedUsers(blockedUsers:Object):void
+			{
+				trace("UserListPanel.setBlockedUsers->  blockedUsers.length: "+blockedUsers.length);
+				for (var i:Object in blockedUsers)
+				{
+					trace("UserListPanel.setBlockedUsers->  blockedUsers[i]: "+blockedUsers[i]+"  i: "+i);
+					for (var y:* in blockedUsers[i])
+					{
+						trace("UserListPanel.setBlockedUsers->  blockedUsers[i][y]: "+blockedUsers[i][y]+"  y: "+y);
+					}
+					
+					for (var x:Object in userList_DP)
+					{
+						if (blockedUsers[i].whoIgnoredAcctID == 0)
+						{
+							if (userList_DP[x].userName == blockedUsers[i].whoIgnoredName)
+							{
+								userList_DP[x].hasBlocked = true;
+							}
+						} else {
+							if (userList_DP[x].acctID == blockedUsers[i].whoIgnoredAcctID)
+							{
+								userList_DP[x].hasBlocked = true;
+							}
+						}
+					}
+					
+					x = null;
+					y = null;
+				}
+				
+				userList_DP.refresh();
+				this.invalidateDisplayList();
+				
+				i = null;
+				blockedUsers = null;
+			}
+			
+			
+			/*
+			public function ignoredUser(ignoreInfo:Object):void
+			{
+				for (var i:Object in userList_DP)
+				{
+					if (ignoreInfo.ignoredWhoName == userInfoObj.userName)
+					{
+						if (userList_DP[i].userName == ignoreInfo.whoIgnoredName)
+						{
+							userList_DP[i].hasBlocked = true;
+						}
+					} else {
+						if (userList_DP[i].userName == ignoreInfo.ignoredWhoName)
+						{
+							this.selectedItem.isIgnored = true;
+						}
+					}
+				}
+				ignoreInfo = null;
+				i = null;
+			}
+			
+			
+			public function unignoredUser(ignoreInfo:Object):void
+			{
+				debugMsg("### UserListPanel.UNIGNORE ###>  whoIgnoredName: "+ignoreInfo.whoIgnoredName+"  ignoredWhoName: "+ignoreInfo.ignoredWhoName);
+				for (var i:Object in userList_DP)
+				{
+					if (ignoreInfo.ignoredWhoName == userInfoObj.nonDuplicateName)
+					{
+						if (userList_DP[i].userName == ignoreInfo.whoIgnoredName)
+						{
+							userList_DP[i].hasBlocked = false;
+						}
+					} else {
+						if (userList_DP[i].userName == ignoreInfo.ignoredWhoName)
+						{
+							this.selectedItem.isIgnored = false;
+						}
+					}
+				}
+				ignoreInfo = null;
+				i = null;
+			}
+			
+			
+			public function setBlockedUsers(blockedUsers:Object):void
+			{
+				debugMsg("|###| UserListPanel.setBlockedUsers |###|>  blockedUsers.length: "+blockedUsers.length);
+				for (var i:Object in blockedUsers)
+				{
+					debugMsg("blockedUsers[i]: "+blockedUsers[i]+"  i: "+i);
+					for (var y:* in blockedUsers[i])
+					{
+						debugMsg("blockedUsers[i][y]: "+blockedUsers[i][y]+"  y: "+y);
+					}
+					for (var x:Object in userList_DP)
+					{
+						if (blockedUsers[i].whoIgnoredAcctID == 0)
+						{
+							if (userList_DP[x].nonDuplicateName == blockedUsers[i].whoIgnoredName)
+							{
+								userList_DP[x].hasBlocked = true;
+							}
+						} else {
+							if (userList_DP[x].acctID == blockedUsers[i].whoIgnoredAcctID)
+							{
+								userList_DP[x].hasBlocked = true;
+							}
+						}
+					}
+					x = null;
+					y = null;
+				}
+				i = null;
+				blockedUsers = null;
+			}
+			*/
+			
+			public function getUserObj(userID:Number):Object
+			{
+				if (AppWide_Singleton.getInstance().appInfoObj.debugMode)
+				{
+					debugMsg("UserListPanel.getUserObj->  userID: "+userID);
+				}
+				var tmpUserObj:Object;
+				for (var i:Object in userList_DP)
+				{
+					if (userList_DP[i].userID == userID)
+					{
+						tmpUserObj = userList_DP[i];
+						if (AppWide_Singleton.getInstance().appInfoObj.debugMode)
+						{
+							debugMsg("UserListPanel.getUserObj->  tmpUserObj: "+tmpUserObj);
+						}
+					}
+				}
+				return tmpUserObj;
+				i = null;
+				tmpUserObj = null;
+			}
+			
+			
+			// dispatched when a user is double clicked
+			private function itemDoubleClickHandler(event:MouseEvent):void
+			{/*
+				if (AppWide_Singleton.getInstance().openPopUps_A.contains(popUpMenu))
+				{
+					AppWide_Singleton.getInstance().openPopUps_A.removeItemAt(AppWide_Singleton.getInstance().openPopUps_A.getItemIndex(popUpMenu));
+				}
+				PopUpManager.removePopUp(popUpMenu);
+				//debugMsg("isUserIgnored:  "+parentDocument.parentDocument.isUserIgnored(event.currentTarget.selectedItem.acctID, event.currentTarget.selectedItem.nonDuplicateName));
+				if (!parentDocument.parentDocument.userListPanel.this.selectedItem.hasBlocked && !parentDocument.parentDocument.isUserIgnored(event.currentTarget.selectedItem.acctID, event.currentTarget.selectedItem.nonDuplicateName))
+				{
+					if ((parentDocument["camSpot1"].isPlayingVideo && parentDocument["camSpot1"].userInfoObj.isUsersVideoOn) || (parentDocument["camSpot1"].isPlayingAudio && parentDocument["camSpot1"].userInfoObj.isUsersAudioOn))
+					{
+						// already playing media in the main cam, so dock the cam if possible
+						var tmpUserObj:Object = parentDocument.parentDocument.parentDocument.parentDocument.lobby["camSpot1"].userInfoObj;
+						parentDocument.dockCamSpot(tmpUserObj,"newUserSelected");
+						parentDocument["camSpot1"].attachUser(event.currentTarget.selectedItem);
+						tmpUserObj = null;
+					} else {
+						// not playing media in the main cam, so attach it like normal
+						parentDocument["camSpot1"].attachUser(event.currentTarget.selectedItem);
+					}
+				}
+				popUpMenu = null;
+				event = null;*/
+				__appWideEventDispatcher.dispatchEvent(new CustomEvent('dockUser',false,false,selectedItem));
+			}
+			
+			
+			private function appClose(event:Event):void
+			{
+				if (usersSO)
+				{
+					if (usersSO.hasEventListener(SyncEvent.SYNC))
+					{
+						usersSO.removeEventListener(SyncEvent.SYNC, userListSoOnSync);
+					}
+					
+					usersSO.clear();
+					usersSO.close();
+					usersSO = null;
+				}
+				
+				AppWide_Singleton.getInstance().usersWithVideoOn_A.splice(0);
+				
+				userList_DP.removeAll();
+				//dataProvider.removeAll();
+				
+				invalidateDisplayList();
+				
+				this.selectedItem = null;
+				userCmdObj = null;
+				popUpMenu = null;
+			}
+			
+			
+			
+			
+			
+			
+			public function addUser(userObj:Object, isOnSync:Boolean):void
+			{
+				//debugMsg("|###| UserListSOClient.addUser |###|>  userObj: "+userObj+"  userID: "+userObj.userID+"  userName: "+userObj.userName);
+				userObj.isOnSync = isOnSync;
+				__appWideEventDispatcher.dispatchEvent(new CustomEvent("userListPanel_addUser",false,false,userObj));
+				invalidateDisplayList();
+				userObj = null;
+			}
+			
+			
+			public function removeUser(userObj:Object):void
+			{
+				//debugMsg("|###| UserListSOClient.removeUser |###|>  userObj: "+userObj+"  userID: "+userObj.userID+" userObj.userName: "+userObj.userName);
+				__appWideEventDispatcher.dispatchEvent(new CustomEvent("userListPanel_removeUser",false,false,userObj));
+				invalidateDisplayList();
+				userObj = null;
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id,str);
+				str = null;
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	
+	
+	
+	
+</s:List>

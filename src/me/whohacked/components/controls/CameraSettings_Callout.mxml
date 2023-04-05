@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Callout xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark"
+		   open="openHandler(event)"
+		   close="closeHandler(event)"
+		   horizontalPosition="middle" 
+		   verticalPosition="middle" 
+		   moveForSoftKeyboard="false" 
+		   backgroundColor="#DDDDDD"
+		   accessibilityEnabled="false"
+		   contentBackgroundColor="#333333">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import flash.permissions.PermissionStatus;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.PopUpEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			
+			
+			private var __appWideSingleton:AppWide_Singleton;
+			[Bindable]
+			private var __localMics_AC:ArrayCollection;
+			[Bindable]
+			private var __localCameras_AC:ArrayCollection;
+			private var __localCameras_A:Array;
+			private var __numLocalCams:uint;
+			
+			private var __localVideo_V:Video;
+			
+			private var __localCamera:Camera;
+			private var __localMic:Microphone;
+			
+			private var __isPreviewingCamera:Boolean;
+			
+			
+			
+			
+			
+			protected function openHandler(event:PopUpEvent):void
+			{
+				debugMsg("openHandler->  ");
+				
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				
+				__numLocalCams = (Camera.isSupported) ? Camera.names.length : 0;
+				__localCameras_A = (Camera.isSupported) ? Camera.names : [];
+				__localCameras_AC = new ArrayCollection();
+				__localMics_AC = new ArrayCollection();
+				
+				if (Camera.isSupported)
+				{
+					__localCamera = Camera.getCamera();
+					
+					if (Camera.permissionStatus != PermissionStatus.GRANTED)
+					{
+						__localCamera.addEventListener(PermissionEvent.PERMISSION_STATUS,
+							function(e:PermissionEvent):void 
+							{
+								if (e.status == PermissionStatus.GRANTED)
+								{
+									initCamera();
+								} else {
+									// permission denied
+								}
+								e = null;
+							}, false,0,true);
+						try {
+							__localCamera.requestPermission();
+						} catch(e:Error)
+						{
+							// another request is in progress
+						}
+					} else {
+						initCamera();
+					}
+				}
+				
+				//__appWideSingleton.localCamera = __localCamera;
+				/*
+				// TEMP
+				if (Microphone.isSupported)
+				{
+					__localMic = Microphone.getMicrophone();
+					
+					if (Microphone.permissionStatus != PermissionStatus.GRANTED)
+					{
+						__localMic.addEventListener(PermissionEvent.PERMISSION_STATUS,
+							function(e:PermissionEvent):void 
+							{
+								if (e.status == PermissionStatus.GRANTED)
+								{
+									// mic allowed
+									initMic();
+								} else {
+									// permission denied
+								}
+							}, false,0,true);
+						
+						try {
+							__localMic.requestPermission();
+						} catch(e:Error)
+						{
+							// another request is in progress
+						}
+					} else {
+						// mic already allowed
+						initMic();
+					}
+				}
+				
+				//__appWideSingleton.localMic = __localMic;
+				*/
+				PopUpManager.centerPopUp(this);
+			}
+			
+			/*
+			private function initMic():void
+			{
+				for (var i:int = 0; i < Microphone.names.length; ++i) 
+				{
+					__localMics_AC.addItem(Microphone.names[i]);
+				}
+			}
+			*/
+			
+			private function closeHandler(event:PopUpEvent):void
+			{
+				debugMsg("closeHandler->  ");
+				
+				if (__localVideo_V)
+				{
+					if (LVideo.contains(__localVideo_V))
+						LVideo.removeChild(__localVideo_V);
+					
+					__localVideo_V.attachCamera(null);
+					__localVideo_V.clear();
+					__localVideo_V = null;
+				}
+				
+				if (__localCamera)
+					__localCamera = null;
+				
+				if (__localMic)
+					__localMic = null;
+				
+				__localCameras_AC.removeAll();
+				__localCameras_AC = null;
+				__localMics_AC.removeAll();
+				__localMics_AC = null;
+			}
+			
+			
+			private function previewCam_Btn_clickHandler(event:MouseEvent):void
+			{
+				switch (previewCam_Btn.label)
+				{
+					case "Preview Cam":
+					{
+						// show the camera
+						if (__localCamera)
+						{
+							setupLocalVideo();
+							
+							__localVideo_V.attachCamera(__localCamera);
+							__localVideo_V.visible = true;
+							
+							previewCam_Btn.label = "Stop";
+							previewCam_Btn.setStyle('color', '#FF0000');
+							previewCam_Btn.alpha = 0.4;
+							
+							__isPreviewingCamera = true;
+						} else {
+							debugMsg('previewCam_Btn_clickHandler->  NO CAM!  __localCamera: '+__localCamera);
+						}
+						break;
+					}
+						
+					case "Stop":
+					{
+						if (__localVideo_V)
+						{
+							if (LVideo.contains(__localVideo_V))
+								LVideo.removeChild(__localVideo_V);
+							
+							__localVideo_V.attachCamera(null);
+							__localVideo_V.clear();
+							
+							previewCam_Btn.label = "Preview Cam";
+							previewCam_Btn.setStyle('color', '#EEEEEE');
+							previewCam_Btn.alpha = 1;
+							
+							__isPreviewingCamera = false;
+						}
+						break;
+					}
+				}
+				
+				debugMsg('previewCam_Btn_clickHandler->  numLocalCams: '+Camera.names.length+'  localCamera: '+__localCamera);
+				//chatDebugMsg('previewCam_Btn_clickHandler->  numLocalCams: '+Camera.names.length+'  localCamera: '+__localCamera);
+			}
+			
+			
+			private function setupLocalVideo():void 
+			{
+				//debug( "Setting up local video" );
+				if (!__localVideo_V)
+					__localVideo_V = new Video( this.LVideo.width, this.LVideo.height );
+				
+				if (!LVideo.contains(__localVideo_V))
+					LVideo.addChild(__localVideo_V);
+			}
+			
+			
+			private function initCamera():void
+			{
+				var cam:Camera;
+				
+				__localCamera = __appWideSingleton.localCamera;
+				
+				for (var i:int = 0; i < __localCameras_A.length; ++i) 
+				{
+					cam = Camera.getCamera(i.toString());
+					
+					// populate the list
+					if (cam.position == CameraPosition.BACK)
+						__localCameras_AC.addItem(CameraPosition.BACK);
+					else if (cam.position == CameraPosition.FRONT)
+						__localCameras_AC.addItem(CameraPosition.FRONT);
+					else
+						__localCameras_AC.addItem(__localCameras_A[i]);
+					
+					// select any previously defined device
+					if ((__appWideSingleton.localCamera) && 
+						(cam.name == __appWideSingleton.localCamera.name))
+						localCameras_L.selectedIndex = i;
+					else
+						// select the first cam by default
+						localCameras_L.selectedIndex = 0;
+				}
+				
+				//if (Camera.names.length <= 1) localCameras_L.visible = false;
+				
+				//debugMsg('initCamera->  numLocalCams: '+__numLocalCams+'  localCamera: '+__appWideSingleton.localCamera+'  localCameras_A: '+__localCameras_A.toString()+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+				//chatDebugMsg('initCamera->  numLocalCams: '+__numLocalCams+'  localCamera: '+__appWideSingleton.localCamera+'  localCameras_A: '+__localCameras_A.toString()+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+				
+				cam = null;
+			}
+				
+				
+			private function connectCamera():void
+			{
+				__appWideSingleton.localCamera = Camera.getCamera(localCameras_L.selectedIndex.toString());
+				
+				debugMsg('initCamera->  numLocalCams: '+__numLocalCams+'  localCamera: '+__appWideSingleton.localCamera+'  localCameras_A: '+__localCameras_A.toString()+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+			}
+			
+			
+			private function localCameras_L_changeHandler(event:IndexChangeEvent):void
+			{
+				if (localCameras_L.selectedIndex == -1) return;
+				
+				__appWideSingleton.localCamera = Camera.getCamera(localCameras_L.selectedIndex.toString());
+				
+				debugMsg("localCameras_L_changeHandler->  selectedItem: "+localCameras_L.selectedItem+"  localCamera: "+__appWideSingleton.localCamera+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+			}
+			
+			
+			private function localCameras_L_valueCommitHandler(event:FlexEvent):void
+			{
+				if (localCameras_L.selectedIndex == -1) return;
+				
+				__appWideSingleton.localCamera = Camera.getCamera(localCameras_L.selectedIndex.toString());
+				
+				debugMsg("localCameras_L_valueCommitHandler->  selectedItem: "+localCameras_L.selectedItem+"  localCamera: "+__appWideSingleton.localCamera+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+			}
+			
+			
+			
+			
+			public function ok_Btn_clickHandler(event:MouseEvent):void
+			{
+				debugMsg("ok_Btn_clickHandler->  isPreviewingCamera: "+__isPreviewingCamera);
+				
+				if (__isPreviewingCamera)
+				{
+					previewCam_Btn_clickHandler(new MouseEvent(MouseEvent.CLICK, false));
+				}
+				
+				close(false);
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.className, str);
+				str = null;
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	<s:VGroup width="100%" height="100%" gap="0"
+			  paddingLeft="3"
+			  paddingRight="3"
+			  paddingTop="3"
+			  paddingBottom="3"
+			  horizontalAlign="center" 
+			  verticalAlign="middle">
+		
+		
+		<!-- local cam with buttons on top -->
+		<s:Group width="100%" height="100%">
+			
+			
+			<s:VideoDisplay id="LVideo"
+							width="320" height="240"
+							horizontalCenter="0"
+							verticalCenter="0"/>
+			
+			
+			<s:VGroup width="100%" height="100%"
+					  horizontalAlign="center" gap="2"
+					  verticalAlign="middle">
+				
+				<s:Button id="previewCam_Btn"
+						  label="Preview Cam"
+						  color="#EEEEEE"
+						  width="200" height="60"
+						  click="previewCam_Btn_clickHandler(event)"
+						  horizontalCenter="0" 
+						  verticalCenter="0"/>
+				
+			</s:VGroup>
+			
+		</s:Group>
+		
+		
+		<s:List id="localCameras_L"
+				width="90%" height="100%"
+				itemRenderer="me.whohacked.components.controls.CameraSettings_LocalCamerasList_ItemRenderer"
+				change="localCameras_L_changeHandler(event)"
+				valueCommit="localCameras_L_valueCommitHandler(event)"
+				dataProvider="{__localCameras_AC}"/>
+		
+		
+		<s:List id="localMics_L"
+				width="90%" height="100%"
+				itemRenderer="me.whohacked.components.controls.CameraSettings_LocalCamerasList_ItemRenderer"
+				dataProvider="{__localMics_AC}"/>
+		
+		
+		<s:Button id="ok_Btn" 
+				  width="250" height="60"
+				  color="#EEEEEE" label="OK" 
+				  click="ok_Btn_clickHandler(event)"/>
+		
+		
+	</s:VGroup>
+	
+	
+	
+	
+	
+</s:Callout>

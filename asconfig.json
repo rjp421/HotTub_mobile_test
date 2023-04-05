@@ -1,0 +1,11 @@
+{
+	"config": "airmobile",
+	"compilerOptions": {
+		"source-path": [
+			"src"
+		],
+		"output": "bin/HotTub_mobile_test.swf"
+	},
+	"mainClass": "HotTub_mobile_test",
+	"application": "src/HotTub_mobile_test-app.xml"
+}

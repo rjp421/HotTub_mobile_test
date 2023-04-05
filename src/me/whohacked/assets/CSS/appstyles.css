@@ -1,0 +1,240 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace chat "me.whohacked.components.chat.*";
+@namespace components "me.whohacked.components.*";
+@namespace userlist "me.whohacked.components.userlist_new.*";
+
+
+
+/*
+@font-face 
+{ 
+	src: url(c:\Windows\Fonts\verdanab.ttf);
+	fontFamily: "Verdana";
+	embedAsCFF: true;
+}
+
+
+@font-face 
+{ 
+	src: url(c:\Windows\Fonts\verdanab.ttf);
+	fontFamily: "Verdana_nocff";
+	embedAsCFF: false;
+}
+*/
+
+
+/**/
+global
+{
+	chromeColor: #1A6600;
+	contentBackgroundColor: #238C00;
+	symbolColor: #EEEEEE;
+	rollOverColor: #00B200;
+	selectionColor: #1A6600;
+	focusColor: #333300;
+	accentColor: #59B200;
+}
+
+
+.userNameLabel
+{
+	color: #00ff00;
+	font-size: 12;
+	font-weight: bold;
+}
+
+/**/
+s|Application
+{
+	backgroundColor: #333333;
+}
+
+
+s|View
+{
+	backgroundAlpha: 0;
+}
+/**/
+/*
+s|Button 
+{
+}
+*/
+/*
+*/
+s|Label
+{
+/*	fontFamily: "Verdana";*/
+	color: #EEEEEE;
+}
+
+s|Button s|Label
+{
+	color: #EEEEEE;
+	font-weight:bold;
+}
+
+
+s|Label.titleText
+{
+	textAlign: center;
+	verticalAlign: middle;
+}
+
+s|TextInput
+{
+	color: #000000;
+	contentBackgroundColor: #EEEEEE;
+}
+
+s|TextArea
+{
+	contentBackgroundColor: #EEEEEE;
+}
+/*
+*/
+
+
+/*
+s|List
+{
+}
+
+components|RoomList s|Label
+{
+	fontSize: 24;
+	color: #000000;
+}
+*/
+
+userlist|UserList_ItemRenderer s|Label
+{
+	fontSize: 22;
+	color: #000000;
+}
+/**/
+
+
+
+
+
+/* low resolution, ui objects will be large */
+/*@media (os-platform: "Android") and (application-dpi: 160)
+{
+	s|Button 
+	{
+		fontSize: 14;
+	}
+	
+	
+	s|Label 
+	{
+		fontSize: 14;
+	}
+	
+	
+	s|Label.titleText
+	{
+		fontSize: 24;
+	}
+}
+*/
+
+
+
+/* medium resolution, ui objects will be a little larger */
+/*@media (os-platform: "Android") and (application-dpi: 240)
+{
+	s|Button 
+	{
+		fontSize: 18;
+	}
+	
+	
+	s|Label 
+	{
+		fontSize: 18;
+	}
+	
+	
+	s|Label.titleText
+	{
+		fontSize: 36;
+	}
+}
+*/
+
+
+
+/* large resolution, ui objects will be small */
+/*@media (os-platform: "Android") and (application-dpi: 320)
+{
+	s|Button 
+	{
+		fontSize: 24;
+	}
+	
+	
+	s|Label 
+	{
+		fontSize: 38;
+	}
+	
+	
+	s|Label.titleText
+	{
+		fontSize: 48;
+	}
+}
+*/
+
+
+
+/* large resolution, ui objects will be very small */
+/*@media (os-platform: "Android") and (application-dpi: 480)
+{
+	s|Button 
+	{
+		fontSize: 28;
+	}
+	
+	
+	s|Label 
+	{
+		fontSize: 38;
+	}
+	
+	
+	s|Label.titleText
+	{
+		fontSize: 48;
+	}
+}
+*/
+
+
+
+/* high resolution, ui objects will be very very small */
+/*@media (os-platform: "Android") and (application-dpi: 640)
+{
+	s|Button 
+	{
+		fontSize: 28;
+	}
+	
+	
+	s|Label 
+	{
+		fontSize: 38;
+	}
+	
+	
+	s|Label.titleText
+	{
+		fontSize: 48;
+	}
+}
+*/
+

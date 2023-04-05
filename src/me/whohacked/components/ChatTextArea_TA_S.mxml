@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TextArea xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx"
+			initialize="initializeHandler(event)"
+			creationComplete="creationCompleteHandler(event)"
+			skinClass="spark.skins.mobile.TextAreaSkin"
+			editable="false" selectable="false">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			
+			import mx.events.FlexEvent;
+			
+			import spark.components.TextArea;
+			import spark.components.supportClasses.StyleableTextField;
+			//import spark.skins.mobile.TextAreaSkin;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			
+			
+			
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton;
+			private var __appWideSingleton:AppWide_Singleton;
+			private var __styleableTextField:StyleableTextField;
+			private var __chatStyleSheet:StyleSheet;
+			private var __chatHistory_Vec:Vector.<String>;
+			private var __historyLineLimit:int = 50;
+			
+			
+			
+			
+			private function initializeHandler(event:FlexEvent):void
+			{
+				__chatHistory_Vec = new Vector.<String>();
+				
+				//__chatStyleSheet = new StyleSheet();
+				
+				//var styles:String =  "a { color: #0C81F5; text-decoration: underline; } a:hover { color: #CCDEF0; text-decoration: underline; }";
+				//var styles:String = "a { color: #405081; text-decoration: none;} a:hover { color: #3366CC; text-decoration: none; } a:active { color: #b60c10; text-decoration: none; }";
+				
+				//__styleableTextField = this.textDisplay as StyleableTextField;
+				
+				//__chatStyleSheet.parseCSS(styles);
+				//__styleableTextField.styleSheet = __chatStyleSheet;
+				//__styleableTextField.styleSheet.parseCSS(styles);
+				
+				// for testing
+				//var format:TextFormat = __styleableTextField.defaultTextFormat; 
+				//format.bullet = null;
+				
+				//__styleableTextField.defaultTextFormat = format;
+				
+				//__styleableTextField.wordWrap = true;
+				
+				//styles = null;
+			}
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				__appWideEventDispatcher = AppWideEventDispatcher_Singleton.getInstance();
+				
+				__appWideEventDispatcher.addEventListener('appClose', appClose, false,0,true);
+				__appWideEventDispatcher.addEventListener('userEnterLeave', userEnterLeave, false,0,true);
+				__appWideEventDispatcher.addEventListener('receiveChatMessage', onReceiveMessage, false,0,true);
+				
+				showIntroText();
+			}
+			
+			
+			private function onReceiveMessage(event:CustomEvent):void
+			{
+				var delimiter:String = ((event.eventObj.isDebugMessage) && (event.eventObj.src != undefined)) ? ' |' : ':';
+				
+				if (!__appWideSingleton.appInfoObj.chatDebugMode) 
+					debugMsg("onReceiveMessage->  userName: "+event.eventObj.userName+"  msg: "+event.eventObj.msg);
+				
+				if (__appWideSingleton.appInfoObj.isAllFontSizeChecked)
+				{
+					event.eventObj.fontSize = __appWideSingleton.appInfoObj.fontSize;
+				}
+				
+				if ((event.eventObj.isAdminMessage) || (event.eventObj.isDebugMessage))
+				{
+					event.eventObj.isBold = true;
+					event.eventObj.fontSize--;
+					event.eventObj.fontColor = '#ff0000';
+					
+					if (event.eventObj.isAdminMessage)
+						event.eventObj.userName = '* Admin';
+					if (event.eventObj.isDebugMessage)
+						event.eventObj.userName = '* DEBUG:  ' + ((event.eventObj.src != undefined) ? event.eventObj.src : '');
+				}
+				
+				if (event.eventObj.isBold)
+				{
+					var bold:String = "<b>";
+					var boldEnd:String = "</b>";
+				} else {
+					bold = "";
+					boldEnd = "";
+				}
+				
+				if (event.eventObj.isItalics)
+				{
+					var italics:String = "<i>";
+					var italicsEnd:String = "</i>";
+				} else {
+					italics = "";
+					italicsEnd = "";
+				}
+				
+				if (event.eventObj.isUnderline)
+				{
+					var underline:String = "<u>";
+					var underlineEnd:String = "</u>";
+				} else {
+					underline = "";
+					underlineEnd = "";
+				}
+				
+				// TEMP FIX
+				showMsg(event.eventObj.userName+":  "+event.eventObj.msg);
+				//showMsg("<font face='Verdana' color='"+event.eventObj.fontColor+"' size='"+event.eventObj.fontSize+"'><b>"+event.eventObj.userName+"</b>"+delimiter+" "+bold+italics+underline+ event.eventObj.msg +underlineEnd+italicsEnd+boldEnd+"</font>");
+			}
+			
+			
+			private function userEnterLeave(event:CustomEvent):void
+			{
+				var userName:String = event.eventObj.userName;
+				var joinLeave:String = event.eventObj.joinLeave;
+				
+				if (joinLeave=='join') joinLeave = 'joined';
+				if (joinLeave=='leave') joinLeave = 'left';
+				
+				if (__appWideSingleton.appInfoObj.isAllFontSizeChecked)
+				{
+					event.eventObj.fontSize = __appWideSingleton.appInfoObj.fontSize;
+				}
+				
+				// TEMP FIX
+				//var msg:String = "<font face='Verdana' color='#00CC00' size='"+event.eventObj.fontSize+"'><b>* "+userName+" "+joinLeave+" the room</b></font>";
+				var msg:String = "* "+userName+" "+joinLeave+" the room";
+				
+				showMsg(msg);
+			}
+			
+			
+			public function showMsg(msg:String):void
+			{
+				//var numLines_test:int = __styleableTextField.numLines;
+				//numLines_test = this.mx_internal::textContainerManager.numLines;
+				//numLines_test = this.textDisplay.textContainerManager.numLines;
+				//numLines_test = this.textFlow.flowComposer.numLines;
+				
+				//if (!__appWideSingleton.appInfoObj.chatDebugMode) 
+				//	debugMsg("showMsg->  numLines: "+__styleableTextField.numLines+"  numLines_test: "+numLines_test+"  chatHistory_Vec.length: "+__chatHistory_Vec.length+"  historyLineLimit: "+__historyLineLimit + "  totalMemory: "+System.totalMemoryNumber);
+				
+				__chatHistory_Vec.push(msg/* + '\n'*/);
+				
+				// TEMP FIX:
+				//__styleableTextField.text += msg + '\n';
+				//__styleableTextField.htmlText += msg;
+				
+				//validateNow();
+				
+				// only show the last X num lines
+				if (__chatHistory_Vec.length >= __historyLineLimit)
+				{
+					// deprecated
+					//__styleableTextField.htmlText = cleanChatHistory(__styleableTextField.htmlText);
+					
+					// clear the old text
+					// TEMP FIX:
+					this.text = '';
+					//__styleableTextField.text = '';
+					//__styleableTextField.htmlText = '';
+					
+					// slice the newest historyLineLimits' number of lines from the chat history Vector
+					// TODO:
+					// test removing the first item of the array (pop/shift?)
+					__chatHistory_Vec = __chatHistory_Vec.splice(((__chatHistory_Vec.length - __historyLineLimit) >= 0) ? (__chatHistory_Vec.length - __historyLineLimit) : 0, __chatHistory_Vec.length);
+					
+					// slice the oldest line of text from the chat history Vector
+					//__chatHistory_Vec = __chatHistory_Vec.slice(1, (__chatHistory_Vec.length - 1));
+					
+					for (var i:int = 0; i < __chatHistory_Vec.length; ++i) 
+					{
+						// TEMP FIX:
+						//__styleableTextField.text += __chatHistory_Vec[i] + '\n';
+						//__styleableTextField.htmlText += __chatHistory_Vec[i];
+						
+						this.appendText(__chatHistory_Vec[i] + '\n');
+					}
+				} else {
+					//this.htmlText += msg;
+					this.appendText(msg + '\n');
+				}
+				
+				// autoscroll, BUGGY
+				// TODO: move?
+				/*
+				callLater(function():void
+				{
+					StyleableTextField(__styleableTextField).styleSheet = __chatStyleSheet; 
+					//StyleableTextField(this.textDisplay as StyleableTextField).styleSheet = __chatStyleSheet; 
+				});
+				*/
+				
+				//this.skin.invalidateSize();
+				
+				//this.invalidateDisplayList();
+				validateNow();
+				
+				//this.textDisplay.verticalScrollPosition = int.MAX_VALUE;
+				this.textDisplay.selectRange(int.MAX_VALUE, int.MAX_VALUE);
+				//this.textDisplay.scrollToRange(this.text.length-1, this.text.length-1);
+				
+				//this.selectRange(int.MAX_VALUE, int.MAX_VALUE);
+				//this.scrollToRange(int.MAX_VALUE, int.MAX_VALUE);
+				//this.scrollToRange(this.text.length-1, this.text.length-1)
+				
+				//validateNow();
+			}
+			
+			
+			
+			// doesnt fix auto-scroll, use selectRange for now
+			/*public function set verticalScrollPosition(value:Number):void
+			{
+				//styleableTextField.scrollV = Math.min(Math.max(0, int(value)), styleableTextField.maxScrollV);
+			}*/
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function showIntroText():void
+			{
+				this.text = '';
+			}
+			
+			
+			public function cleanChatHistory(str:String):String
+			{
+				debugMsg("cleanChatHistory->  ");
+				
+				var pattern:RegExp;
+				var pattern2:RegExp;
+				var matchArray:Array;
+				var newChatArray:Array;
+				var arrString:String;
+				
+				pattern = /<P.*?<\/P>/g; // "<P" through "/P>"
+				pattern2 = /<\/P>,<P/g;
+				
+				matchArray = str.match(pattern);
+				
+				newChatArray = matchArray.slice(((matchArray.length - __historyLineLimit) >= 0) ? (matchArray.length - __historyLineLimit) : 0, matchArray.length);
+				
+				arrString = newChatArray.toString().replace(pattern2, "<\/P><P");
+				
+				do{
+					arrString = arrString.replace('<FONT FACE="_sans" SIZE="16" COLOR="#000000" LETTERSPACING="0" KERNING="0">', "");
+				}
+				while(arrString.indexOf('<FONT FACE="_sans" SIZE="16" COLOR="#000000" LETTERSPACING="0" KERNING="0">') != -1);
+				
+				do{
+					arrString = arrString.replace('<P ALIGN="LEFT"><B>', '<P ALIGN="LEFT"><FONT><B>');
+				}
+				while(arrString.indexOf('<P ALIGN="LEFT"><B>') != -1);
+				
+				do{
+					arrString = arrString.replace('</FONT></FONT>', "</FONT>");
+				}
+				while(arrString.indexOf('</FONT></FONT>') != -1);
+				
+				newChatArray = null;
+				matchArray = null;
+				pattern2 = null;
+				pattern = null;
+				str = null;
+				
+				return '<TEXTFORMAT LEADING="2">' + arrString + '</TEXTFORMAT>';
+			}
+			
+			
+			
+			/*
+			<TEXTFORMAT LEADING="2">
+				<P ALIGN="LEFT">
+					<FONT FACE="_sans" SIZE="16" COLOR="#000000" LETTERSPACING="0" KERNING="0">
+						<B>Guest:</B> asdg
+					</FONT>
+				</P>
+			</TEXTFORMAT>
+			
+			<TEXTFORMAT LEADING="2">
+				<P ALIGN="LEFT">
+					<FONT FACE="Verdana" SIZE="14" COLOR="#006600" LETTERSPACING="0" KERNING="0"><B>Reb</B>:
+						<FONT FACE="_sans" SIZE="24" COLOR="#000000">
+							<FONT FACE="undefined" SIZE="14" COLOR="#006600"><B>high im back</B>
+								<FONT FACE="Verdana"></FONT>
+							</FONT>
+						</FONT>
+					</FONT>
+				</P>
+			</TEXTFORMAT>
+			
+			<P ALIGN="LEFT">
+				<FONT FACE="Verdana" SIZE="14" COLOR="#CC0000" LETTERSPACING="0" KERNING="0"><B>miamifan1_3503</B>:
+					<FONT FACE="undefined" COLOR="#FF0033">
+						<FONT COLOR="#CC0000"><B>what style</B></FONT>
+					</FONT>
+				</FONT>
+			</P>
+			*/
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function appClose(event:Event):void
+			{
+				__chatHistory_Vec = __chatHistory_Vec.slice(0, __chatHistory_Vec.length - 1);
+				
+				//__styleableTextField.htmlText = '';
+				this.text = '';
+				
+				validateNow();
+				
+				event = null;
+			}
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id, str);
+				
+				str = null;
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	
+	
+</s:TextArea>

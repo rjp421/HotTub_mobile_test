@@ -1,0 +1,762 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark"
+		xmlns:camspot="me.whohacked.components.camspot.*" 
+		xmlns:userlist="me.whohacked.components.userlist_new.*" 
+		xmlns:controls="me.whohacked.components.controls.*"
+		xmlns:components="me.whohacked.components.*" 
+		initialize="initializeHandler(event)"
+		creationComplete="creationCompleteHandler(event)">
+	
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center" verticalAlign="middle"/>
+	</s:layout>
+	
+	<s:states>
+		<s:State name="portraitPhone" stateGroups="portrait,phone"/>
+		<s:State name="landscapePhone" stateGroups="landscape,phone"/>
+		<s:State name="portraitTablet" stateGroups="portrait,tablet"/>
+		<s:State name="landscapeTablet" stateGroups="landscape,tablet"/>
+	</s:states>
+	
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.events.CustomEvent;
+			import me.whohacked.net.NetConnectionManager_Singleton;
+			
+			
+			private var __appWideSingleton:AppWide_Singleton;
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton;
+			
+			private var __userList_AC:ArrayCollection;
+			private var __usersWithVideoOn_A:Array;
+			
+			public var chatTextFormat:Object = {};
+			public var toCamSpot:String = "";
+			public var fromCamSpot:String = "";
+			
+			
+			
+			private function initializeHandler(event:FlexEvent):void
+			{
+				
+				event = null;
+			}
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				__appWideSingleton = AppWide_Singleton.getInstance();
+				__appWideEventDispatcher = AppWideEventDispatcher_Singleton.getInstance();
+				
+				__appWideEventDispatcher.addEventListener('appClose', appClose, false,0,true);
+				__appWideEventDispatcher.addEventListener('onApplicationComplete', onApplicationComplete, false,0,true);
+				__appWideEventDispatcher.addEventListener('onApplicationStateChange', onApplicationStateChange, false,0,true);
+				__appWideEventDispatcher.addEventListener('onStageOrientationEvent', onStageOrientationEvent, false,0,true);
+				
+				__appWideEventDispatcher.addEventListener('onUserLoggedIn', onUserLoggedIn, false,0,true);
+				__appWideEventDispatcher.addEventListener('onUserLoggedOut', onUserLoggedOut, false,0,true);
+				
+				__appWideEventDispatcher.addEventListener('dockUser', dockUser, false,0,true);
+				__appWideEventDispatcher.addEventListener('undockUser', undockUser, false,0,true);
+				__appWideEventDispatcher.addEventListener('autoDockCams', autoDockCams, false,0,true);
+				
+				__appWideEventDispatcher.addEventListener("mediaSOClient_userVideoOn",userVideoOn, false,0,true);
+				__appWideEventDispatcher.addEventListener("mediaSOClient_userVideoOff",userVideoOff, false,0,true);
+				__appWideEventDispatcher.addEventListener("mediaSOClient_userAudioOn",userAudioOn, false,0,true);
+				__appWideEventDispatcher.addEventListener("mediaSOClient_userAudioOff",userAudioOff, false,0,true);
+				
+				__userList_AC = __appWideSingleton.userList_AC;
+				__usersWithVideoOn_A = __appWideSingleton.usersWithVideoOn_A;
+				
+				chatTextFormat.isBold = false;
+				chatTextFormat.isItalics = false;
+				chatTextFormat.isUnderline = false;
+				chatTextFormat.fontSize = '16';
+				chatTextFormat.fontColor = "#"+'009900';
+				
+				event = null;
+			}
+			
+			
+			private function onUserLoggedIn(event:Event):void
+			{
+				debugMsg("onUserLoggedIn->");
+				
+				event = null;
+			}
+			
+			
+			private function onUserLoggedOut(event:Event):void
+			{
+				debugMsg("onUserLoggedOut->");
+				
+				// TODO:
+				// force close the users cam if theyre docked
+				
+				event = null;
+			}
+			
+			
+			private function sendMsg_Btn_clickHandler(event:MouseEvent):void
+			{
+				sendChatMessage();
+				
+				event = null;
+			}
+			
+			
+			private function onEnterKeyHandler(event:FlexEvent):void
+			{
+				sendChatMessage();
+				
+				event = null;
+			}
+			
+			
+			private function sendChatMessage():void
+			{
+				if (!chatTextInput_TI.text.length)
+					return;
+				
+				var msgObj:Object = chatTextFormat;
+				
+				// DEBUG ONLY
+				if (chatTextInput_TI.text.toLocaleLowerCase() == '/debug')
+				{
+					if (__appWideSingleton.appInfoObj.debugMode)
+						__appWideSingleton.setAppInfo('debugMode', false);
+					else
+						__appWideSingleton.setAppInfo('debugMode', true);
+					
+					msgObj = {msg:'debugMode is now: ' + (__appWideSingleton.appInfoObj.debugMode ? 'ENABLED' : 'DISABLED'), isDebugMessage:true};
+					
+					__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage', false,false, msgObj));
+				} else if (chatTextInput_TI.text.toLocaleLowerCase() == '/chatdebug') {
+					if (__appWideSingleton.appInfoObj.chatDebugMode)
+						__appWideSingleton.setAppInfo('chatDebugMode', false);
+					else
+						__appWideSingleton.setAppInfo('chatDebugMode', true);
+					
+					msgObj = {msg:'chatDebugMode is now: ' + (__appWideSingleton.appInfoObj.chatDebugMode ? 'ENABLED' : 'DISABLED'), isDebugMessage:true};
+					
+					__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage', false,false, msgObj));
+				} else if (chatTextInput_TI.text.toLocaleLowerCase() == '/appinfo') {
+					msgObj = {isDebugMessage:true, msg:'\n'};
+					
+					//msgObj.msg += '* Application Info:'+'\n';
+					for (var i:* in __appWideSingleton.appInfoObj) 
+					{
+						//msgObj.msg += '		' + i + ' = ' + __appWideSingleton.appInfoObj[i] + '\n';
+					}
+					
+					msgObj.msg += '* Compatibility Info:'+'\n';
+					for (i in __appWideSingleton.compatibilityInfoObj) 
+					{
+						msgObj.msg += '		' + i + ' = ' + __appWideSingleton.compatibilityInfoObj[i] + '\n';
+					}
+					
+					__appWideEventDispatcher.dispatchEvent(new CustomEvent('receiveChatMessage', false,false, msgObj));
+					
+					i = null;
+				} else {
+					msgObj.clientID = __appWideSingleton.userInfoObj.clientID;
+					msgObj.userID = __appWideSingleton.userInfoObj.userID;
+					msgObj.userName = __appWideSingleton.userInfoObj.userName;
+					msgObj.acctID = __appWideSingleton.userInfoObj.acctID;
+					msgObj.acctName = __appWideSingleton.userInfoObj.acctName;
+					msgObj.isPrivate = false;
+					
+					msgObj.msg = chatTextInput_TI.text;
+					
+					NetConnectionManager_Singleton.getNetConnection().call("chatManager.sendMessage", null, msgObj);
+				}
+				
+				chatTextInput_TI.text = '';
+				
+				msgObj = null;
+			}
+			
+			
+			private function dockUser(event:CustomEvent):void
+			{
+				if (isUserDocked(event.eventObj.userID)) return;
+				
+				dockCamSpot(event.cloneCustomEvent().eventObj, 'newUserSelected');
+				
+				event = null;
+			}
+			
+			
+			private function undockUser(event:CustomEvent):void
+			{
+				if (!isUserDocked(event.eventObj.userID)) return;
+				
+				undockCamSpot(event.cloneCustomEvent().eventObj);
+				
+				event = null;
+			}
+			
+			
+			public function dockCamSpot(userObj:Object, fromCamSpot:String="autoDock"):void
+			{
+				var _isUserDocked:Boolean = isUserDocked(userObj.userID);
+				
+				debugMsg("dockCamSpot->  userID: "+userObj.userID+"  isUserDocked: "+isUserDocked+"  fromCamSpot: "+fromCamSpot);
+				
+				userObj.fromCamSpot = fromCamSpot;
+				
+				if (_isUserDocked) return;
+				
+				if (fromCamSpot == "autoDock")
+				{
+					for (var x:int = 0; x < __appWideSingleton.largeCamIDs_A.length; ++x) 
+					{
+						if (!this[__appWideSingleton.largeCamIDs_A[x]]) break;
+						
+						debugMsg("dockCamSpot->  "+__appWideSingleton.largeCamIDs_A[x]+"  visible: "+this[__appWideSingleton.largeCamIDs_A[x]].visible+"  includeInLayout: "+this[__appWideSingleton.largeCamIDs_A[x]].includeInLayout);
+						
+						if ((!this[__appWideSingleton.largeCamIDs_A[x]]) || 
+							(!this[__appWideSingleton.largeCamIDs_A[x]].includeInLayout)) 
+							break;
+						
+						/* if a large cam spot is empty */
+						if ((this[__appWideSingleton.largeCamIDs_A[x]].userInfoObj.userID == 0) && 
+							(this[__appWideSingleton.largeCamIDs_A[x]].userInfoObj.userID != userObj.userID))
+						{
+							/* dock someone to it */
+							this[__appWideSingleton.largeCamIDs_A[x]].switchCamSpot(userObj);
+							return;
+						}
+					}
+					
+					/* fill the rest of the cams */
+					for (x = 0; x < __appWideSingleton.camSpotIDs_A.length; ++x)
+					{
+						if (!this[__appWideSingleton.camSpotIDs_A[x]]) break;
+						
+						debugMsg("dockCamSpot->  "+__appWideSingleton.camSpotIDs_A[x]+"  visible: "+this[__appWideSingleton.camSpotIDs_A[x]].visible+"  includeInLayout: "+this[__appWideSingleton.camSpotIDs_A[x]].includeInLayout);
+						
+						if ((!this[__appWideSingleton.camSpotIDs_A[x]]) || 
+							(!this[__appWideSingleton.camSpotIDs_A[x]].includeInLayout)) 
+							break;
+						
+						if ((this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID == 0) && 
+							(this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID != userObj.userID))
+						{
+							this[__appWideSingleton.camSpotIDs_A[x]].switchCamSpot(userObj);
+							return;
+						}
+					}
+				} else if (fromCamSpot == "newUserSelected") {
+					for (x = 0; x < __appWideSingleton.largeCamIDs_A.length; ++x)
+					{
+						if (!this[__appWideSingleton.largeCamIDs_A[x]]) break;
+						
+						debugMsg("dockCamSpot->  "+__appWideSingleton.largeCamIDs_A[x]+"  visible: "+this[__appWideSingleton.largeCamIDs_A[x]].visible+"  includeInLayout: "+this[__appWideSingleton.largeCamIDs_A[x]].includeInLayout);
+						
+						if ((!this[__appWideSingleton.largeCamIDs_A[x]]) || 
+							(!this[__appWideSingleton.largeCamIDs_A[x]].includeInLayout)) 
+							break;
+						
+						if (this[__appWideSingleton.largeCamIDs_A[x]].userInfoObj.userID == 0)
+						{
+							this[__appWideSingleton.largeCamIDs_A[x]].switchCamSpot(userObj);
+							return;
+						}
+					}
+					
+					for (x = 0; x < __appWideSingleton.camSpotIDs_A.length; ++x)
+					{
+						if (!this[__appWideSingleton.camSpotIDs_A[x]]) break;
+						
+						debugMsg("dockCamSpot->  "+__appWideSingleton.camSpotIDs_A[x]+"  visible: "+this[__appWideSingleton.camSpotIDs_A[x]].visible+"  includeInLayout: "+this[__appWideSingleton.camSpotIDs_A[x]].includeInLayout);
+						
+						if ((!this[__appWideSingleton.camSpotIDs_A[x]]) || 
+							(!this[__appWideSingleton.camSpotIDs_A[x]].includeInLayout)) 
+							break;
+						
+						if ((this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID == 0) && 
+							(this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID != userObj.userID))
+						{
+							this[__appWideSingleton.camSpotIDs_A[x]].switchCamSpot(userObj);
+							return;
+						}
+					}
+				}
+				
+				function randomMinMax(min:Number, max:Number):Number
+				{
+					return min + (max - min) * Math.round(Math.random());
+				}
+				
+				fromCamSpot = null;
+				userObj = null;
+			}
+			
+			
+			public function undockCamSpot(userObj:Object):void
+			{
+				for (var x:int = 0; x < __appWideSingleton.camSpotIDs_A.length; ++x)
+				{
+					if ((!this[__appWideSingleton.camSpotIDs_A[x]]) || 
+						(this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID == 0)) 
+						break;
+					
+					if (this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID == userObj.userID)
+					{
+						debugMsg("undockCamSpot->  CLEARING "+__appWideSingleton.camSpotIDs_A[x]);
+						
+						this[__appWideSingleton.camSpotIDs_A[x]].clearCamSpot();
+					}
+				}
+				
+				userObj = null;
+			}
+			
+			
+			public function undockAllCamSpots():void
+			{
+				for (var x:int = 0; x < __appWideSingleton.camSpotIDs_A.length; ++x)
+				{
+					if ((!this[__appWideSingleton.camSpotIDs_A[x]]) || 
+						(this[__appWideSingleton.camSpotIDs_A[x]].userInfoObj.userID == 0)) 
+						break;
+					
+					debugMsg("undockAllCamSpots->  CLEARING "+__appWideSingleton.camSpotIDs_A[x]);
+					
+					this[__appWideSingleton.camSpotIDs_A[x]].clearCamSpot();
+				}
+				
+				__appWideSingleton.dockedUserIDs_A.splice(0);
+			}
+			
+			
+			
+			public function switchToMain(userObj:Object, fromCamSpot:String):void
+			{
+				debugMsg("switchToMain->  userID: "+userObj.userID+"  fromCamSpot: "+fromCamSpot);
+				
+				var tmpUserObj:Object;
+				for (var i:int = 0; i < __appWideSingleton.largeCamIDs_A.length; ++i) 
+				{
+					if (!this[__appWideSingleton.largeCamIDs_A[i]]) break;
+					
+					if ((__appWideSingleton.backgroundCamSpotIDs_A.indexOf(__appWideSingleton.largeCamIDs_A[i].id) == -1) && 
+						(this[__appWideSingleton.largeCamIDs_A[i]].userInfoObj.userID == 0))
+					{
+						tmpUserObj = this[__appWideSingleton.largeCamIDs_A[i]].userInfoObj;
+						tmpUserObj.fromCamSpot = fromCamSpot;
+						userObj.fromCamSpot = fromCamSpot;
+						
+						this[__appWideSingleton.largeCamIDs_A[i]].switchCamSpot(userObj);
+						this[fromCamSpot].switchCamSpot(tmpUserObj);
+						return;
+					}
+				}
+				
+				tmpUserObj = null;
+				userObj = null;
+				fromCamSpot = null;
+			}
+			
+			
+			public function autoDockCams(event:Event):void
+			{
+				debugMsg("autoDockCams->  usersWithVideoOn_A.length: " + __usersWithVideoOn_A.length);
+				
+				if (__appWideSingleton.appInfoObj.isAutoFillCamsChecked)
+				{
+					// randomize the array
+					var arr2:Array = [];
+					while (__usersWithVideoOn_A.length > 0)
+					{
+						arr2.push(__usersWithVideoOn_A.splice(Math.round(Math.random() * (__usersWithVideoOn_A.length - 1)), 1)[0]);
+					}
+					
+					__usersWithVideoOn_A = arr2;
+					
+					for (var i:int = 0; i < __usersWithVideoOn_A.length; ++i)
+					{
+						var userObj:Object = userList_L.getUserObj(__usersWithVideoOn_A[i]);
+						
+						if ((!userObj) || (isUserDocked(__usersWithVideoOn_A[i]))) return;
+						
+						//i = Math.random() * __appWideSingleton.dockedUsers_AC.length;
+						if (/*(!dockedUsers.contains(userObj.userID)) && */(userObj.isUsersVideoOn) /*&& (!isUserIgnored(userObj.acctID, userObj.nonDuplicateName)) && (!userObj.hasBlocked)*/)
+						{
+							dockCamSpot(userObj, "autoDock");
+						}
+						
+						userObj = null;
+					}
+					
+					//for (i = 1; i <= userList_DP.length; ++i) { if(userList_DP[i].hasVideoOn) { doSomething } else { i-- };
+					/*
+					var indexes:Vector.<uint> = new Vector(); 
+					for(var i:int = 0, len:int = __appWideSingleton.dockedUsers_AC.length; i<len; ++i) 
+					{ 
+					indexes.addItem(i); 
+					}
+					*/
+					/*
+					var cloneCopy:Array = __appWideSingleton.dockedUsers_AC.source.concat(); 
+					while(cloneCopy.length)
+					{ 
+					var randomIndex:int= Math.random()*cloneCopy.length; 
+					var randomEntry:Object = cloneCopy.splice(randomIndex,1);
+					if ((!dockedUsers.contains(__appWideSingleton.dockedUsers_AC[i].userID)) && (__appWideSingleton.dockedUsers_AC[i].isUsersVideoOn) && (!isUserIgnored(__appWideSingleton.dockedUsers_AC[i].acctID, __appWideSingleton.dockedUsers_AC[i].nonDuplicateName)) && (!__appWideSingleton.dockedUsers_AC[i].hasBlocked))
+					{
+					dockCamSpot(__appWideSingleton.dockedUsers_AC[i],"autoDock");
+					}
+					}*/
+				}
+				
+				event = null;
+			}
+			
+			
+			
+			private function userVideoOn(event:CustomEvent):void
+			{
+				var _isUserDocked:Boolean = isUserDocked(event.eventObj.userID);
+				
+				debugMsg("userVideoOn->  userID: "+event.eventObj.userID+"  isUserDocked: "+_isUserDocked);
+				
+				// do not auto-dock the user if isAutoFillCamsChecked is not true
+				if (!__appWideSingleton.appInfoObj.isAutoFillCamsChecked) return;
+				
+				for (var i:int = 0; i < __appWideSingleton.userList_AC.length; ++i)
+				{
+					if (__appWideSingleton.userList_AC[i].userID == event.eventObj.userID)
+					{
+						var userObj:Object = __appWideSingleton.userList_AC[i];
+						
+						if ((!isUserIgnored(userObj.acctID, userObj.nonDuplicateName)) && 
+							(!isUserDocked(userObj.userID)))
+						{
+							dockCamSpot(userObj, "autoDock");
+						}
+						
+						userObj = null;
+						break;
+					}
+				}
+				
+				event = null;
+			}
+			
+			
+			private function userVideoOff(event:CustomEvent):void
+			{
+				debugMsg("userVideoOff->  userID: "+event.eventObj.userID+"  isUserDocked: "+isUserDocked(event.eventObj.userID));
+				
+				for (var i:int = 0; i < __appWideSingleton.userList_AC.length; ++i)
+				{
+					if (__appWideSingleton.userList_AC[i].userID == event.eventObj.userID)
+					{
+						if (isUserDocked(__appWideSingleton.userList_AC[i].userID))
+						{
+							undockCamSpot(event.eventObj);
+						}
+						
+						break;
+					}
+				}
+				
+				event = null;
+			}
+			
+			
+			private function userAudioOn(event:CustomEvent):void
+			{
+				for (var i:Object in __appWideSingleton.userList_AC)
+				{
+					if (__appWideSingleton.userList_AC[i].userID == event.eventObj.userID)
+					{
+						__appWideSingleton.userList_AC[i].isUsersAudioOn = true;
+						break;
+					}
+				}
+				
+				i = null;
+				event = null;
+			}
+			
+			
+			private function userAudioOff(event:CustomEvent):void
+			{
+				for (var i:Object in __appWideSingleton.userList_AC)
+				{
+					if (__appWideSingleton.userList_AC[i].userID == event.eventObj.userID)
+					{
+						__appWideSingleton.userList_AC[i].isUsersAudioOn = false;
+						break;
+					}
+				}
+				
+				i = null;
+				event = null;
+			}
+			
+			
+			private function isUserDocked(userID:String):Boolean
+			{
+				//debugMsg("isUserDocked->  userID: " + "user_"+userID + "  indexOf: " + __appWideSingleton.dockedUserIDs_A.indexOf("user_" + userID));
+				
+				return __appWideSingleton.dockedUserIDs_A.indexOf("user_" + userID) != -1;
+			}
+			
+			
+			// TODO
+			private function isUserIgnored(acctID:String, userName:String):Boolean
+			{
+				return false;
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			public function onApplicationComplete(event:Event):void
+			{
+				debugMsg("onApplicationComplete->  applicationState: "+__appWideSingleton.appInfoObj.applicationState);
+				
+				currentState = __appWideSingleton.appInfoObj.applicationState;
+				
+				// TEST
+				//if (__appWideSingleton.appInfoObj.isPhone)
+				//	__appWideSingleton.setAppInfo("fontSize", 20);
+				
+				event = null;
+			}
+			
+			
+			public function onApplicationStateChange(event:Event):void
+			{
+				debugMsg("onApplicationStateChange->  applicationState: "+__appWideSingleton.appInfoObj.applicationState);
+				
+				currentState = __appWideSingleton.appInfoObj.applicationState;
+				
+				event = null;
+			}
+			
+			
+			public function onStageOrientationEvent(event:Event):void
+			{
+				//debugMsg("onStageOrientationEvent->  applicationState: "+__appWideSingleton.appInfoObj.applicationState);
+				
+				for (var x:int = 0; x < __appWideSingleton.camSpotIDs_A.length; ++x)
+				{
+					var _camSpot:CamSpot = this[__appWideSingleton.camSpotIDs_A[x]];
+					
+					if (!_camSpot) break;
+					
+					//debugMsg("onStageOrientationEvent->  <"+__appWideSingleton.camSpotIDs_A[x]+">  visible: "+_camSpot.visible+"  includeInLayout: "+_camSpot.includeInLayout+"  userID: "+_camSpot.userInfoObj.userID);
+					
+					if (!_camSpot.visible)
+					{
+						debugMsg("onStageOrientationEvent->  PAUSING AND HIDING: " + _camSpot.id + "  backgroundCamSpotIDs_A: " + __appWideSingleton.backgroundCamSpotIDs_A.toString());
+						
+						if (__appWideSingleton.backgroundCamSpotIDs_A.indexOf(_camSpot.id) == -1)
+							__appWideSingleton.backgroundCamSpotIDs_A.push(_camSpot.id);
+						
+						if (_camSpot.isPlayingVideo)
+						{
+							_camSpot.wasPlayingVideo = true;
+							_camSpot.videoOnOffBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false));
+						}
+						if (_camSpot.isPlayingAudio)
+						{
+							_camSpot.wasPlayingAudio = true;
+							_camSpot.audioOnOffBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false));
+						}
+						
+						_camSpot.isHidden = true;
+					} else {
+						debugMsg("onStageOrientationEvent->  UNPAUSING AND SHOWING: " + _camSpot.id + "  backgroundCamSpotIDs_A: " + __appWideSingleton.backgroundCamSpotIDs_A.toString());
+						
+						_camSpot.isHidden = false;
+						
+						if (_camSpot.wasPlayingVideo)
+						{
+							_camSpot.wasPlayingVideo = false;
+							_camSpot.videoOnOffBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false));
+						}
+						if (_camSpot.wasPlayingAudio)
+						{
+							_camSpot.wasPlayingAudio = false;
+							_camSpot.audioOnOffBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false));
+						}
+						
+						if (__appWideSingleton.backgroundCamSpotIDs_A.indexOf(_camSpot.id) != -1)
+							__appWideSingleton.backgroundCamSpotIDs_A.splice(__appWideSingleton.backgroundCamSpotIDs_A.indexOf(_camSpot.id), 1);
+					}
+					
+					_camSpot = null;
+				}
+				
+				event = null;
+			}
+			
+			
+			private function appClose(event:Event):void
+			{
+				__appWideSingleton.setAppInfo('chatDebugMode', false);
+				
+				undockAllCamSpots();
+				
+				event = null;
+			}
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id, str);
+				str = null;
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	<!-- cams on top, chat on bottom -->
+	<s:HGroup width="100%" 
+			  horizontalAlign="center"
+			  verticalAlign="middle">
+		
+		
+		<!-- 2 large cams with 4 small cams -->
+		<s:HGroup width="100%" 
+				  horizontalAlign="center"
+				  verticalAlign="middle">
+			
+			
+			<camspot:CamSpot id="camSpot1" 
+							 width="320" height="240"/>
+			
+			<camspot:CamSpot id="camSpot2" 
+							 visible="false"
+							 visible.landscapeTablet="true"
+							 includeIn="landscapeTablet"
+							 width="320" height="240"/>
+			
+			
+			<!-- small cams - left side -->
+			<s:VGroup includeIn="landscape">
+				
+				<camspot:CamSpot id="camSpot3" 
+								 includeIn="landscape"
+								 width="160" height="120"/>
+				
+				<camspot:CamSpot id="camSpot4" 
+								 includeIn="landscape"
+								 width="160" height="120"/>
+				
+			</s:VGroup>
+			
+			
+			<!-- small cams - right side -->
+			<s:VGroup includeIn="landscape">
+				
+				<camspot:CamSpot id="camSpot5" 
+								 includeIn="landscape"
+								 width="160" height="120"/>
+				
+				<camspot:CamSpot id="camSpot6" 
+								 includeIn="landscape"
+								 width="160" height="120"/>
+				
+			</s:VGroup>
+			
+		</s:HGroup>
+		
+		
+		<controls:ChatControls id="chatControls" width="200"/>
+		
+		
+	</s:HGroup>
+	
+	
+	<!-- row of cams below the large cam on top -->
+	<s:HGroup includeIn="portrait">
+		
+		<fx:Reparent includeIn="portrait" target="camSpot3"/>
+		<fx:Reparent includeIn="portrait" target="camSpot4"/>
+		<fx:Reparent includeIn="portrait" target="camSpot5"/>
+		<fx:Reparent includeIn="portrait" target="camSpot6"/>
+		
+	</s:HGroup>
+	
+	
+	<!-- chat & userlist -->
+	<s:HGroup width="100%" height="100%" 
+			  verticalAlign="middle" 
+			  horizontalAlign="center">
+		
+		
+		<s:VGroup width="100%" height="100%" 
+				  verticalAlign="middle" 
+				  horizontalAlign="center">
+			
+			
+			<components:ChatTextArea_TA_S id="chatArea_TA" 
+										  width="100%" height="100%"/>
+			
+			
+			<s:HGroup width="100%" height="40" 
+					  verticalAlign="middle" 
+					  horizontalAlign="center">
+				
+				<s:TextInput id="chatTextInput_TI" 
+							 width="100%" height="100%"
+							 skinClass="spark.skins.mobile.TextInputSkin"
+							 accessibilityEnabled="false"
+							 enter="onEnterKeyHandler(event)"/>
+				
+				<s:Button id="sendMsg_Btn" 
+						  width="120" height="100%"
+						  label="Send" color="#EEEEEE"
+						  click="sendMsg_Btn_clickHandler(event)"/>
+				
+			</s:HGroup>
+			
+			
+		</s:VGroup>
+		
+		
+		<userlist:UserList id="userList_L"
+						   bottom="1" right="1"
+						   width="200" height="100%"/>
+		
+	</s:HGroup>
+	
+	
+	
+	
+</s:View>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				creationComplete="creationCompleteHandler(event)">
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.app.IconManager_Singleton;
+			
+			
+			private var __iconManager:IconManager_Singleton = IconManager_Singleton.getInstance();
+			
+			
+			override public function set data(value:Object):void
+			{
+				if (!value) return;
+				
+				super.data = value;
+				
+				userName_L.text = data.userName;
+				userName_L.toolTip = userName_L.text;
+				
+				if (AppWide_Singleton.getInstance().appInfoObj.isPhone)
+					userName_L.setStyle('fontSize', '28');
+				
+				if (data.acctID == 0)
+					userIcon_Img.source = __iconManager.getIcon('app_userList_guest');
+				else if ((data.adminType == 'rm') || (data.adminType == 'ra') || (data.adminType == 'ga') || (data.adminType == 'sa'))
+					userIcon_Img.source = __iconManager.getIcon('app_userList_'+data.adminType);
+				else
+					userIcon_Img.source = __iconManager.getIcon('app_userList_member');
+				
+				if (data.isUsersVideoOn)
+				{
+					if (this['isUsersVideoOn_Img']!=null) this['isUsersVideoOn_Img'].source = __iconManager.getIcon('app_cam');
+				} else {
+					if (this['isUsersVideoOn_Img']!=null) this['isUsersVideoOn_Img'].source = null;
+				}
+				
+				if (data.isUsersAudioOn)
+				{
+					if (this['isUsersAudioOn_Img']!=null) this['isUsersAudioOn_Img'].source = __iconManager.getIcon('app_audio');
+				} else {
+					if (this['isUsersAudioOn_Img']!=null) this['isUsersAudioOn_Img'].source = null;
+				}
+			}
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				//debugMsg('creationCompleteHandler->  itemIndex: '+itemIndex+'  userName: '+data.userName+'  userID: '+data.userID);
+			}
+			
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.toString(),str);
+			}	
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	<s:Image id="userIcon_Img"
+			 verticalCenter="0"
+			 height="20" width="20"
+			 cacheAsBitmap="true"/>
+	
+	
+	<s:Label id="userName_L" height="100%" 
+			 left="20" right="20" 
+			 verticalAlign="middle" lineBreak="explicit"
+			 maxDisplayedLines="1"/>
+	
+	
+	<s:VGroup width="10" height="100%" 
+			  gap="0" right="0">
+		
+		<s:Image id="isUsersVideoOn_Img"
+				 height="10" width="10"
+				 cacheAsBitmap="true"/>
+		
+		<s:Image id="isUsersAudioOn_Img"
+				 height="10" width="10"
+				 cacheAsBitmap="true"/>
+		
+	</s:VGroup>
+	
+	
+	
+	
+	
+	
+</s:ItemRenderer>

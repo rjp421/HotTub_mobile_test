@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark"
+		creationComplete="creationCompleteHandler(event)"
+		title="Login" backgroundAlpha="0">
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center" verticalAlign="middle"/>
+	</s:layout>
+	
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			import mx.utils.StringUtil;
+			
+			import me.whohacked.app.AppWideDebug_Singleton;
+			import me.whohacked.app.AppWideEventDispatcher_Singleton;
+			import me.whohacked.app.AppWide_Singleton;
+			import me.whohacked.app.IconManager_Singleton;
+			import me.whohacked.events.CustomEvent;
+			import me.whohacked.net.AppWideNetConnection;
+			import me.whohacked.net.NetConnectionManager_Singleton;
+			
+			
+			public var nc:AppWideNetConnection = NetConnectionManager_Singleton.getNetConnection();
+			
+			private var __appWideEventDispatcher:AppWideEventDispatcher_Singleton = AppWideEventDispatcher_Singleton.getInstance();
+			private var __appWideSingleton:AppWide_Singleton = AppWide_Singleton.getInstance();
+			private var __userInfoObj:Object = AppWide_Singleton.getUserInfoObj();
+			
+			
+			
+			private function creationCompleteHandler(event:FlexEvent):void
+			{
+				__appWideEventDispatcher.addEventListener('onNCConnected', onNCConnected, false,0,true);
+				__appWideEventDispatcher.addEventListener('onNCRejected', onNCRejected, false,0,true);
+				__appWideEventDispatcher.addEventListener('onNCFailed', onNCFailed, false,0,true);
+				__appWideEventDispatcher.addEventListener('onNCClosed', onNCClosed, false,0,true);
+				
+				__appWideEventDispatcher.addEventListener('connectApp', connectApp, false,0,true);
+				__appWideEventDispatcher.addEventListener('appClose', appClose, false,0,true);
+				
+				__appWideEventDispatcher.addEventListener('onSetUserID', onSetUserID, false,0,true);
+				__appWideEventDispatcher.addEventListener('onApplicationComplete', onApplicationComplete, false,0,true);
+				__appWideEventDispatcher.addEventListener('onApplicationStateChange', onApplicationStateChange, false,0,true);
+				
+				//__appWideEventDispatcher.addEventListener('setLoginStatusInfo', onNCClosed, false,0,true);
+			}
+			
+			
+			private function onApplicationComplete(event:Event):void
+			{
+				if (this[__appWideSingleton.appInfoObj.defaultQuality + 'Quality_RB'])
+					this[__appWideSingleton.appInfoObj.defaultQuality + 'Quality_RB'].selected = true;
+			}
+			
+			
+			private function onApplicationStateChange(event:Event):void
+			{
+			}
+			
+			
+			private function appClose(event:Event):void
+			{
+				disconnect();
+			}
+			
+			
+			private function onSetUserID(event:CustomEvent):void
+			{
+				debugMsg("onSetUserID->  clientID: "+event.eventObj.clientID+"  acctID: "+event.eventObj.acctID+"  userID: "+event.eventObj.userID+"  userName: "+event.eventObj.userName);
+				
+				__appWideSingleton.appInfoObj.previousClientID = event.eventObj.clientID;
+				
+				__userInfoObj.clientID = event.eventObj.clientID;
+				__userInfoObj.acctID = event.eventObj.acctID;
+				__userInfoObj.userID = event.eventObj.userID;
+				__userInfoObj.userName = event.eventObj.userName;
+				__userInfoObj.ignores = event.cloneCustomEvent().eventObj.blockedUsersObj;
+				
+				//userName_TI.text = __userInfoObj.userName;
+				
+				__appWideEventDispatcher.dispatchEvent(new Event("onUserLoggedIn"));
+				__appWideEventDispatcher.dispatchEvent(new CustomEvent("userListPanel_onGetUserList", false, false, event.cloneCustomEvent().eventObj.userListObj));
+				
+				event = null;
+			}
+			
+			
+			private function enterHandler(event:FlexEvent):void
+			{
+				loginBtn.dispatchEvent(new MouseEvent(MouseEvent.CLICK,false,false));
+				
+				event = null;
+			}
+			
+			
+			private function loginBtn_clickHandler(event:MouseEvent):void
+			{
+				if (!userName_TI.text.length) return;
+				
+				switch (loginBtn.label)
+				{
+					case "Login":
+						setLoginStatusInfo("Logging into the chat...");
+						
+						loginBtn.label = "Cancel";
+						
+						// disable the components until the connection is closed
+						userName_TI.enabled = false;
+						password_TI.enabled = false;
+						roomName_TI.enabled = false;
+						
+						// trim whitespaces from the beginning/end of the user/room names
+						userName_TI.text = StringUtil.trim(userName_TI.text);
+						roomName_TI.text = StringUtil.trim(roomName_TI.text);
+						
+						login(userName_TI.text, password_TI.text, roomName_TI.text);
+						break;
+					case "Cancel":
+						disconnect();
+						break;
+				}
+				
+				event = null;
+			}
+			
+			
+			public function login(userName:String, password:String, roomName:String):void
+			{
+				var params:Object = new Object();
+				
+				params.userName = parseOutHTML(userName);
+				params.password = parseOutHTML(password);
+				params.roomName = parseOutHTML(roomName);
+				
+				params.version = __appWideSingleton.version;
+				params.previousClientID = __appWideSingleton.appInfoObj.previousClientID;
+				params.defaultQuality = __appWideSingleton.appInfoObj.defaultQuality;
+				params.compatibilityInfoObj = __appWideSingleton.compatibilityInfoObj;
+				
+				// check if it is connected
+				if (!nc.connected)
+				{
+					connect(params);
+				}
+				
+				params = null;
+				roomName = null;
+				password = null;
+				userName = null;
+			}
+			
+			
+			private function connectApp(event:CustomEvent):void
+			{
+				connect(event.eventObj);
+				
+				event = null;
+			}
+			
+			
+			private function connect(_params:Object):void
+			{
+				// connect to the server
+				//NetConnectionManager_Singleton.connect('rtmpe', '192.168.10.104', 'tub2010_server', _params.roomName, _params);
+				//NetConnectionManager_Singleton.connect('rtmpe', '192.168.10.11', 'tub2010_server', _params.roomName, _params);
+				NetConnectionManager_Singleton.connect('rtmpe', 'media.whohacked.me', 'tub2010_server', _params.roomName, _params);
+				//NetConnectionManager_Singleton.connect('rtmpe', 'media2.BongTVLive.com', 'tub2010_server', _params.roomName, _params);
+				//NetConnectionManager_Singleton.connect('rtmfp', 'media.tokes4folks.com', 'tub2010_server', _params.roomName, _params);
+				//NetConnectionManager_Singleton.connect('rtmfp', 'media.BongTVLive.com', 'tub2010_server', _params.roomName, _params);
+				
+				_params = null;
+			}
+			
+			
+			private function disconnect():void
+			{
+				// close the NetConnection
+				nc.close();
+				
+				// re-enable the components
+				userName_TI.enabled = true;
+				password_TI.enabled = true;
+				roomName_TI.enabled = true;
+				
+				loginBtn.label = "Login";
+			}
+			
+			
+			private function setLoginStatusInfo(msg:String):void
+			{
+				loginStatusInfo_L.text = msg;
+				msg = null;
+			}
+			
+			
+			private function onNCConnected(event:CustomEvent):void
+			{
+				setLoginStatusInfo("Connected! Loading the chat...");
+				
+				event = null;
+			}
+			
+			
+			private function onNCFailed(event:CustomEvent):void
+			{
+				setLoginStatusInfo("Connection failed! Please login again.");
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('appClose'));
+				
+				event = null;
+			}
+			
+			
+			private function onNCRejected(event:CustomEvent):void
+			{
+				setLoginStatusInfo("Connection rejected!  Error: "+event.eventObj.info.code);
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('appClose'));
+				
+				event = null;
+			}
+			
+			
+			private function onNCClosed(event:CustomEvent):void
+			{
+				setLoginStatusInfo("Connection closed! Please login again.");
+				
+				//Alert.show("Connection lost!"+"\n"+"Please login again."+"\n"+"\n"+"If this problem persists, try a lower quality and make sure there is not a problem with your internet connection.");
+				
+				__appWideEventDispatcher.dispatchEvent(new Event('appClose'));
+				
+				event = null;
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function onQualityRBClicked(event:MouseEvent):void
+			{
+				var quality:String = event.target.id.split('Quality_RB',1)[0];
+				__appWideSingleton.appInfoObj.defaultQuality = quality;
+				
+				event = null;
+			}
+			
+			
+			
+			//get rid of all brackets that a user might have put in
+			public function parseOutHTML(str:String):String
+			{
+				do{
+					str = str.replace(/</, "&lt;");
+				}
+				while(str.indexOf("<") != -1);
+				do{
+					str = str.replace(/>/, "&gt;");
+				}
+				while(str.indexOf(">") != -1);
+				// block &#xa;
+				do{
+					str = str.replace("&#","");
+				}
+				while(str.indexOf("&#") != -1);
+				return str;
+			}
+			
+			
+			
+			
+			private function debugMsg(str:String):void
+			{
+				AppWideDebug_Singleton.getInstance().newDebugMessage(this.id, str);
+				str = null;
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	
+	
+	<s:Label id="loginStatusInfo_L"/>
+	
+	
+	<s:HGroup width="100%" horizontalAlign="center">
+		
+		<s:Label height="100%" text="Username:" verticalAlign="middle" textAlign="center"/>
+		<s:Spacer width="5"/>
+		<s:TextInput id="userName_TI" 
+					 prompt="42 chars max"
+					 returnKeyLabel="done"
+					 maxChars="42" width="320" 
+					 enter="enterHandler(event)" 
+					 accessibilityEnabled="false"/>
+	</s:HGroup>
+	
+	
+	<s:HGroup width="100%" horizontalAlign="center">
+		
+		<s:Label height="100%" text="Password:" verticalAlign="middle" textAlign="center"/>
+		<s:Spacer width="5"/>
+		<s:TextInput id="password_TI"
+					 returnKeyLabel="done" enter="enterHandler(event)"
+					 width="320" displayAsPassword="true" prompt="128 chars max"
+					 maxChars="128" accessibilityEnabled="false"/>
+		
+	</s:HGroup>
+	
+	
+	<s:HGroup width="100%" horizontalAlign="center" includeInLayout="false">
+		
+		<s:Label height="100%" text="Room:" verticalAlign="middle" textAlign="center"/>
+		<s:Spacer width="5"/>
+		<s:TextInput id="roomName_TI" 
+					 returnKeyLabel="done" enter="enterHandler(event)"
+					 width="320" text="lobby" accessibilityEnabled="false"
+					 maxChars="42" prompt="42 chars max"/>
+		
+	</s:HGroup>
+	
+	
+	<s:Button id="loginBtn" label="Login"
+			  width="320" height="80" color="#EEEEEE"
+			  icon="{IconManager_Singleton.getInstance().getIcon('app_door_in')}"
+			  click="loginBtn_clickHandler(event)"/>
+	
+	
+	
+	<s:Spacer height="30"/>
+	
+	
+	<s:Label text="Quality:" fontWeight="bold"/>
+	
+	
+	<s:Spacer height="10"/>
+	
+	
+	<s:HGroup width="100%" gap="20"
+			  horizontalAlign="center"
+			  verticalAlign="middle">
+		
+		<s:HGroup horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="Low" fontSize="20" />
+			<s:RadioButton id="lowQuality_RB" click="onQualityRBClicked(event)" 
+						   selected="false"/>
+		</s:HGroup>
+		<s:HGroup horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="Medium" fontSize="20" />
+			<s:RadioButton id="mediumQuality_RB" click="onQualityRBClicked(event)" 
+						   selected="false"/>
+		</s:HGroup>
+		<s:HGroup horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="High" fontSize="20" />
+			<s:RadioButton id="highQuality_RB" click="onQualityRBClicked(event)" 
+						   selected="false"/>
+		</s:HGroup>
+		<s:HGroup horizontalAlign="center" verticalAlign="middle">
+			<s:Label text="HD" fontSize="20" />
+			<s:RadioButton id="hdQuality_RB" click="onQualityRBClicked(event)" 
+						   selected="false"/>
+		</s:HGroup>
+		
+	</s:HGroup>
+	
+	
+	<s:Spacer height="30"/>
+	
+	
+	<s:Label text="WARNING: This app uses a lot of bandwidth, best used on WiFi!" 
+			 fontSize="20" fontWeight="normal" color="#FFFF00"/>
+	
+	
+</s:View>
