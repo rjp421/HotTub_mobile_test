@@ -52,7 +52,7 @@ package me.whohacked.util
 				return DPIClassification.DPI_320;
 			}
 			
-			/*
+			/**/
 			if (Capabilities.screenDPI <= 560)
 			{
 				trace("DPITestClass | get runtimeDPI->  RETURNING: "+DPIClassification.DPI_480);
@@ -63,7 +63,7 @@ package me.whohacked.util
 				trace("DPITestClass | get runtimeDPI->  RETURNING: "+DPIClassification.DPI_640);
 				return DPIClassification.DPI_640;
 			}
-			*/
+			
 			trace("DPITestClass | get runtimeDPI->  RETURNING: "+DPIClassification.DPI_320);
 			return DPIClassification.DPI_320;
 		}

@@ -171,7 +171,8 @@
 				// connect to the server
 				//NetConnectionManager_Singleton.connect('rtmpe', '192.168.10.104', 'tub2010_server', _params.roomName, _params);
 				//NetConnectionManager_Singleton.connect('rtmpe', '192.168.10.11', 'tub2010_server', _params.roomName, _params);
-				NetConnectionManager_Singleton.connect('rtmpe', 'media.whohacked.me', 'tub2010_server', _params.roomName, _params);
+				//NetConnectionManager_Singleton.connect('rtmpe', 'media.whohacked.me', 'tub2010_server', _params.roomName, _params);
+				NetConnectionManager_Singleton.connect('rtmfp', 'media.whohacked.me', 'tub2010_server', _params.roomName, _params);
 				//NetConnectionManager_Singleton.connect('rtmpe', 'media2.BongTVLive.com', 'tub2010_server', _params.roomName, _params);
 				//NetConnectionManager_Singleton.connect('rtmfp', 'media.tokes4folks.com', 'tub2010_server', _params.roomName, _params);
 				//NetConnectionManager_Singleton.connect('rtmfp', 'media.BongTVLive.com', 'tub2010_server', _params.roomName, _params);

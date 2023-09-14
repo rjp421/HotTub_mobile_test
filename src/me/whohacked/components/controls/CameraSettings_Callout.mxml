@@ -235,7 +235,7 @@
 				
 				for (var i:int = 0; i < __localCameras_A.length; ++i) 
 				{
-					cam = Camera.getCamera(i.toString());
+					cam = Camera.getCamera(String(i));
 					
 					// populate the list
 					if (cam.position == CameraPosition.BACK)
@@ -265,9 +265,9 @@
 				
 			private function connectCamera():void
 			{
-				__appWideSingleton.localCamera = Camera.getCamera(localCameras_L.selectedIndex.toString());
+				__appWideSingleton.localCamera = Camera.getCamera(String(localCameras_L.selectedIndex));
 				
-				debugMsg('initCamera->  numLocalCams: '+__numLocalCams+'  localCamera: '+__appWideSingleton.localCamera+'  localCameras_A: '+__localCameras_A.toString()+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
+				debugMsg('connectCamera->  numLocalCams: '+__numLocalCams+'  localCamera: '+__appWideSingleton.localCamera+'  localCameras_A: '+__localCameras_A.toString()+'  localCameraName: '+__appWideSingleton.localCamera.name+'  localCameraPosition: '+__appWideSingleton.localCamera.position);
 			}
 			
 			

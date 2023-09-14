@@ -9,6 +9,7 @@ package me.whohacked.net
 	import me.whohacked.app.AppWideDebug_Singleton;
 	import me.whohacked.app.AppWideEventDispatcher_Singleton;
 	import me.whohacked.events.CustomEvent;
+	import me.whohacked.util.AIRPermissions;
 	
 	//import flash.net.ObjectEncoding;
 	
@@ -78,6 +79,9 @@ package me.whohacked.net
 			
 			if (!__instance.__nc.connected)
 			{
+				// check permissions
+				__instance.debugMsg("createNetConnection->  Permission "+AIRPermissions.checkNetworkPermission());
+
 				__instance.debugMsg("createNetConnection->  fmsServer: "+fmsServer+"  fmsApp: "+fmsApp+"  fmsAppInstance: "+fmsAppInstance+"  params: "+params);
 				
 				// dispatch a custom .Connecting event

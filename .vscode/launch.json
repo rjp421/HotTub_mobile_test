@@ -4,10 +4,23 @@
       {
         "type": "swf",
         "request": "launch",
+        "name": "Launch SWF (S7)",
+        "program": "${workspaceFolder}/bin/HotTub_mobile_test-app.xml",
+        "args": [],
+        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\AIRSDK_50.2.2\\bin\\adl64.exe",
+        "profile": "mobileDevice",
+        "screensize": "1440x2560:1440x2560",
+        "screenDPI": 576,
+        "versionPlatform": "AND",
+        "preLaunchTask": "Adobe AIR: package Android debug - asconfig.json"
+      },
+      {
+        "type": "swf",
+        "request": "launch",
         "name": "Launch SWF (N7)",
         "program": "${workspaceFolder}/bin/HotTub_mobile_test-app.xml",
         "args": [],
-        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\bin\\adl64.exe",
+        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\AIRSDK_50.2.3\\bin\\adl64.exe",
         "profile": "mobileDevice",
         "screensize": "1200x1920:1200x1824",
         "screenDPI": 323,
@@ -16,15 +29,10 @@
       },
       {
         "type": "swf",
-        "request": "launch",
-        "name": "Launch SWF (S7)",
-        "program": "${workspaceFolder}/bin/HotTub_mobile_test-app.xml",
-        "args": [],
-        "runtimeExecutable": "C:\\share\\dev\\AIR\\AIRSDK\\bin\\adl64.exe",
-        "profile": "mobileDevice",
-        "screensize": "1440x2560:1440x2560",
-        "screenDPI": 576,
-        "versionPlatform": "AND",
+        "request": "attach",
+        "name": "Install and Attach (Android)",
+        //"connect": true,
+        "platform": "android",
         "preLaunchTask": "Adobe AIR: package Android debug - asconfig.json"
       }
     ]

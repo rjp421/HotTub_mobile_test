@@ -10,8 +10,8 @@ package me.whohacked.app
 	
 	public class AppWide_Singleton
 	{
-		// version 4, date 02-17-2018, build 01
-		public var version:Number = 40217201801;
+		// version 4, date 09-14-2023, build 01
+		public var version:Number = 40914202301;
 		public var debugMode:Boolean = true;
 		
 		public var localCamera:Camera;
