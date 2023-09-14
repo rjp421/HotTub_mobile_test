@@ -6,6 +6,24 @@
 		],
 		"output": "bin/HotTub_mobile_test.swf"
 	},
+	"airOptions": {
+		"ios": {
+			"output": "bin/HotTub_mobile_test.ipa",
+			//"listen": true,
+			"signingOptions": {
+				"storetype": "pkcs12",
+				"keystore": "C:\\share\\dev\\AIR\\AIR_cert.p12"
+			}
+		},
+		"android": {
+			"output": "bin/HotTub_mobile_test.apk",
+			//"listen": true,
+			"signingOptions": {
+				"storetype": "pkcs12",
+				"keystore": "C:\\share\\dev\\AIR\\AIR_cert.p12"
+			}
+		}
+	},
 	"mainClass": "HotTub_mobile_test",
 	"application": "src/HotTub_mobile_test-app.xml"
 }

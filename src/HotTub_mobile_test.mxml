@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
-							xmlns:s="library://ns.adobe.com/flex/spark" 
-							xmlns:components="me.whohacked.components.*"
-							xmlns:events="me.whohacked.events.*"
-							preinitialize="preinitializeHandler(event)"
-							addedToStage="addedToStageHandler(event)"
-							applicationComplete="applicationCompleteHandler(event)"
-							activate="appActivatedHandler(event)"
-							deactivate="appDeactivatedHandler(event)" 
-							runtimeDPIProvider="me.whohacked.util.DPITestClass"
-							currentState="login">
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:components="me.whohacked.components.*"
+				xmlns:events="me.whohacked.events.*"
+				preinitialize="preinitializeHandler(event)"
+				addedToStage="addedToStageHandler(event)"
+				applicationComplete="applicationCompleteHandler(event)"
+				activate="appActivatedHandler(event)"
+				deactivate="appDeactivatedHandler(event)" 
+				runtimeDPIProvider="me.whohacked.util.DPITestClass"
+				currentState="login">
 	<!--  -->
 	
 	
